@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Web3 Minecraft Benzeri Oyun</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="game-container">
+      <canvas id="gameCanvas"></canvas>
+
+      <!-- Menü butonu -->
+      <button id="menuButton" class="menu-button">☰</button>
+
+      <!-- Oyun menüsü -->
+      <div id="gameMenu" class="game-menu hidden">
+        <div class="menu-header">
+          <h2>Oyun Menüsü</h2>
+          <button id="closeMenu" class="close-button">✕</button>
+        </div>
+        <div class="menu-content">
+          <div class="menu-section">
+            <h3>Web3 İşlemleri</h3>
+            <button id="connectWallet">Cüzdanı Bağla</button>
+            <button id="mintLand">Arazi Oluştur</button>
+            <button id="viewInventory">Envanteri Görüntüle</button>
+          </div>
+          <div class="menu-section">
+            <h3>Oyun Ayarları</h3>
+            <button id="toggleDebug">Debug Modu</button>
+            <button id="toggleFullscreen">Tam Ekran</button>
+          </div>
+          <div class="menu-section">
+            <h3>Kontroller</h3>
+            <p>WASD veya Ok Tuşları: Hareket</p>
+            <p>Boşluk: Zıplama</p>
+            <p>1-9: Blok seçimi</p>
+            <p>B: İnşa modunu aç/kapa</p>
+            <p>Sol Tık: Blok yerleştir</p>
+            <p>Sağ Tık: Blok kaldır</p>
+            <p>ESC: Menüyü aç/kapa</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modüler JS dosyaları -->
+    <script src="config.js"></script>
+    <script src="player.js"></script>
+    <script src="physics.js"></script>
+    <script src="world.js"></script>
+    <script src="web3Integration.js"></script>
+    <script src="game.js"></script>
+    <script src="main.js"></script>
+  </body>
+</html>
