@@ -26,23 +26,23 @@ class World {
 
           if (depth < 4) {
             // Üst toprak katmanı
-            this.blocks[y][x] = 1; // Toprak
+            this.blocks[y][x] = 3; // Toprak
           } else if (depth < 10) {
             // Taş katmanı
-            if (Math.random() < 0.05) {
+            if (Math.random() < 0.01) {
               // Nadir kömür/demir madenleri
               this.blocks[y][x] = 2; // Taş
             } else {
-              this.blocks[y][x] = 1; // Toprak
+              this.blocks[y][x] = 3; // Toprak
             }
           } else {
             // En derin katman - lav ve değerli madenler
-            if (Math.random() < 0.02) {
+            if (Math.random() < 0.01) {
               this.blocks[y][x] = 7; // Lav
             } else if (Math.random() < 0.1) {
               this.blocks[y][x] = 2; // Taş
             } else {
-              this.blocks[y][x] = 1; // Toprak
+              this.blocks[y][x] = 3; // Toprak
             }
           }
         } else {
@@ -60,12 +60,6 @@ class World {
 
     // Lav havuzları ekle
     this.generateLavaPools();
-
-    // Rastgele ağaçlar ekle
-    this.generateTrees();
-
-    // Rastgele kum alanları ekle
-    this.generateSandAreas();
   }
 
   addGrassLayer() {
@@ -91,11 +85,11 @@ class World {
     // Kapı için zemin oluştur (3 blok genişliğinde düz platform)
     for (let x = doorX - 1; x <= doorX + 1; x++) {
       // Zemini tuğla yap
-      this.blocks[groundLevel][x] = 9; // Tuğla
+      this.blocks[groundLevel][x] = 3; // Tuğla
 
       // Kapı altındaki blokları da tuğla yap (2 blok derinliğinde)
-      this.blocks[groundLevel + 1][x] = 9;
-      this.blocks[groundLevel + 2][x] = 9;
+      this.blocks[groundLevel + 1][x] = 3;
+      this.blocks[groundLevel + 2][x] = 3;
 
       // Kapının üstündeki blokları temizle
       for (let y = groundLevel - 3; y >= groundLevel - 5; y--) {
@@ -104,20 +98,6 @@ class World {
         }
       }
     }
-
-    // Kapı çerçevesi oluştur
-    // Sol duvar
-    this.blocks[groundLevel - 1][doorX - 1] = 3; // Ahşap
-    this.blocks[groundLevel - 2][doorX - 1] = 3;
-
-    // Sağ duvar
-    this.blocks[groundLevel - 1][doorX + 1] = 3;
-    this.blocks[groundLevel - 2][doorX + 1] = 3;
-
-    // Üst kiriş
-    this.blocks[groundLevel - 3][doorX - 1] = 3;
-    this.blocks[groundLevel - 3][doorX] = 3;
-    this.blocks[groundLevel - 3][doorX + 1] = 3;
 
     // Kapı bloğu
     this.blocks[groundLevel - 1][doorX] = 8; // Kapı
@@ -195,73 +175,6 @@ class World {
                 Math.random() < 0.7
               ) {
                 this.blocks[newY][newX] = 7; // Lav
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  generateTrees() {
-    const groundLevel = Math.floor(this.height * 0.4);
-
-    // Zemin seviyesinde rastgele ağaçlar ekle
-    for (let x = 0; x < this.width; x++) {
-      // Kapıdan uzakta olsun
-      if (Math.abs(x - this.doorPosition.x) > 10 && Math.random() < 0.05) {
-        // Ağaç gövdesi
-        const treeHeight = 3 + Math.floor(Math.random() * 3); // 3-5 blok yüksekliğinde
-
-        for (let y = 1; y <= treeHeight; y++) {
-          this.blocks[groundLevel - y][x] = 3; // Ahşap
-        }
-
-        // Ağaç yaprakları
-        for (let dy = -2; dy <= 0; dy++) {
-          for (let dx = -2; dx <= 2; dx++) {
-            const leafX = x + dx;
-            const leafY = groundLevel - treeHeight - 1 + dy;
-
-            if (
-              leafX >= 0 &&
-              leafX < this.width &&
-              leafY >= 0 &&
-              leafY < this.height &&
-              !(dx === 0 && dy === 0) // Gövdenin üstünde yaprak olmasın
-            ) {
-              // Yaprakları çim bloğu olarak temsil ediyoruz
-              this.blocks[leafY][leafX] = 4; // Çim
-            }
-          }
-        }
-      }
-    }
-  }
-
-  generateSandAreas() {
-    const groundLevel = Math.floor(this.height * 0.4);
-
-    // Zemin seviyesinde rastgele kum alanları ekle
-    for (let x = 0; x < this.width; x++) {
-      if (Math.random() < 0.02) {
-        // Kum alanı merkezi
-        if (this.blocks[groundLevel][x] === 4) {
-          // Eğer çim ise
-          this.blocks[groundLevel][x] = 5; // Kum
-
-          // Kum alanını genişlet
-          for (let dx = -3; dx <= 3; dx++) {
-            const sandX = x + dx;
-
-            if (
-              sandX >= 0 &&
-              sandX < this.width &&
-              Math.random() < 0.7 - Math.abs(dx) * 0.15
-            ) {
-              if (this.blocks[groundLevel][sandX] === 4) {
-                // Eğer çim ise
-                this.blocks[groundLevel][sandX] = 5; // Kum
               }
             }
           }

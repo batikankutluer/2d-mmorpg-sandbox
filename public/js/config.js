@@ -9,10 +9,10 @@ const CONFIG = {
   GRAVITY: 0.12, // Daha düşük yerçekimi
   FRICTION: 0.96, // Daha yüksek sürtünme
   TERMINAL_VELOCITY: 3.5, // Daha düşük terminal hız
-  JUMP_FORCE: -3.5, // Daha düşük zıplama kuvveti
+  JUMP_FORCE: -4.0, // Daha düşük zıplama kuvveti
 
   // Oyuncu
-  PLAYER_SPEED: 1.0, // Daha düşük hız
+  PLAYER_SPEED: 1.5, // Daha düşük hız
   PLAYER_WIDTH: 1, // Tam kare
   PLAYER_HEIGHT: 1, // 1 blok yüksekliğinde
 
