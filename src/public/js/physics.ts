@@ -1,5 +1,6 @@
 import CONFIG from "./config.js";
 import Game from "./game.js";
+import { PlayerState } from "./player.js";
 
 // Basit fizik motoru
 class PhysicsEngine {
@@ -29,8 +30,30 @@ class PhysicsEngine {
     // Oyuncuya yerçekimi uygula
     this.applyGravity();
 
-    // Oyuncunun hareketini güncelle - önce yatay sonra dikey
+    // Oyuncunun hareketini güncelle
+    // Not: updatePlayerMovement içinde pozisyon güncellemesi yapmıyoruz
+    // Sadece hız hesaplamaları ve platform kenarı kontrolü yapıyoruz
     this.updatePlayerMovement();
+
+    // Platform kenarında olup olmadığını kontrol et
+    const onPlatformEdge = this.isOnPlatformEdge();
+
+    // Oyuncunun merkez X pozisyonu
+    const playerCenterX = this.game.player.x + this.game.player.width / 2;
+    const playerCenterBlockX = Math.floor(playerCenterX / CONFIG.BLOCK_SIZE);
+    const playerBottom = Math.floor(
+      (this.game.player.y + this.game.player.height) / CONFIG.BLOCK_SIZE
+    );
+
+    // Oyuncunun merkezi bir platform üzerinde mi?
+    const centerBlockType = this.game.world.getBlock(
+      playerCenterBlockX,
+      playerBottom
+    );
+    const isCenterOnPlatform =
+      centerBlockType !== undefined &&
+      CONFIG.BLOCK_TYPES[centerBlockType]?.solid &&
+      CONFIG.BLOCK_TYPES[centerBlockType]?.isPlatform;
 
     // Çarpışma kontrolü - önce yatay sonra dikey hareket için ayrı kontrol
     // Daha küçük adımlarla hareket ettirerek daha doğru çarpışma kontrolü
@@ -53,6 +76,15 @@ class PhysicsEngine {
       // Sonra dikey hareket
       this.game.player.y += this.game.player.velocityY;
       this.checkVerticalCollisions();
+
+      // Platform kenarında ise ve hızlı yatay hareket varsa, düşmeyi kolaylaştır
+      if (
+        onPlatformEdge &&
+        Math.abs(this.game.player.velocityX) > 0.5 &&
+        !isCenterOnPlatform
+      ) {
+        this.game.player.velocityY += (this.gravity * 0.1) / steps;
+      }
     }
 
     // Hızları orijinal değerlerine geri getir, ancak çarpışma durumunda değişmiş olabilirler
@@ -72,6 +104,9 @@ class PhysicsEngine {
 
     // Dünya sınırlarını kontrol et
     this.checkWorldBoundaries();
+
+    // Platform kenarlarını kontrol et ve gerekirse düş
+    this.handlePlatformEdges();
   }
 
   applyGravity(): void {
@@ -90,9 +125,42 @@ class PhysicsEngine {
   }
 
   updatePlayerMovement(): void {
-    // Hızları pozisyona uygula - önce yatay sonra dikey hareket
-    this.game.player.x += this.game.player.velocityX;
-    this.game.player.y += this.game.player.velocityY;
+    // NOT: Pozisyon güncellemesi artık update fonksiyonunda yapılıyor
+    // Burada sadece hız hesaplamaları ve platform kenarı kontrolü yapıyoruz
+
+    // Platform kenarlarında düşme kontrolü
+    if (this.isOnPlatformEdge()) {
+      // Eğer oyuncu platform kenarındaysa ve yatay hareket varsa
+      // Hafif bir yerçekimi uygula (düşmeyi kolaylaştırmak için)
+      // Ancak sadece hızlı hareket ediyorsa
+      if (Math.abs(this.game.player.velocityX) > 0.5) {
+        this.game.player.velocityY += this.gravity * 0.8;
+
+        // Oyuncunun merkez X pozisyonu
+        const playerCenterX = this.game.player.x + this.game.player.width / 2;
+        const playerCenterBlockX = Math.floor(
+          playerCenterX / CONFIG.BLOCK_SIZE
+        );
+        const playerBottom = Math.floor(
+          (this.game.player.y + this.game.player.height) / CONFIG.BLOCK_SIZE
+        );
+
+        // Oyuncunun merkezi bir platform üzerinde mi?
+        const centerBlockType = this.game.world.getBlock(
+          playerCenterBlockX,
+          playerBottom
+        );
+        const isCenterOnPlatform =
+          centerBlockType !== undefined &&
+          CONFIG.BLOCK_TYPES[centerBlockType].solid &&
+          CONFIG.BLOCK_TYPES[centerBlockType].isPlatform;
+
+        // Eğer oyuncunun merkezi platform üzerinde değilse, düşmeyi hızlandır
+        if (!isCenterOnPlatform) {
+          this.game.player.setState(PlayerState.FALLING);
+        }
+      }
+    }
 
     // Oyuncu animasyonunu güncelle
     if (Math.abs(this.game.player.velocityX) > 0.1) {
@@ -109,30 +177,215 @@ class PhysicsEngine {
     }
   }
 
-  isOnGround(): boolean {
-    // Oyuncunun altındaki blokları kontrol et
-    const playerLeft = Math.floor(this.game.player.x / CONFIG.BLOCK_SIZE);
+  isOnPlatformEdge(): boolean {
+    // Oyuncunun altındaki blokları kontrol et - daha dar bir çarpışma kutusu kullan
+    const playerLeft = Math.floor(
+      (this.game.player.x + this.game.player.width * 0.15) / CONFIG.BLOCK_SIZE
+    );
     const playerRight = Math.floor(
-      (this.game.player.x + this.game.player.width - 1) / CONFIG.BLOCK_SIZE
+      (this.game.player.x + this.game.player.width * 0.85) / CONFIG.BLOCK_SIZE
     );
     const playerBottom = Math.floor(
       (this.game.player.y + this.game.player.height) / CONFIG.BLOCK_SIZE
     );
 
+    // Oyuncunun ayaklarının tam pozisyonu
+    const playerBottomPos = this.game.player.y + this.game.player.height;
+
+    // Oyuncunun merkez X pozisyonu
+    const playerCenterX = this.game.player.x + this.game.player.width / 2;
+    const playerCenterBlockX = Math.floor(playerCenterX / CONFIG.BLOCK_SIZE);
+
+    // Sınırları kontrol et
+    if (
+      playerBottom < 0 ||
+      playerBottom >= this.game.world.height ||
+      playerLeft < 0 ||
+      playerRight >= this.game.world.width
+    ) {
+      return false;
+    }
+
+    // Önce oyuncunun bir platform üzerinde olup olmadığını kontrol et
+    let onPlatform = false;
+    let platformBlocks = [];
+
     // Oyuncunun altındaki tüm blokları kontrol et
     for (let x = playerLeft; x <= playerRight; x++) {
+      const blockType = this.game.world.getBlock(x, playerBottom);
+
+      // Eğer blok bir platform ise
+      if (
+        blockType !== undefined &&
+        CONFIG.BLOCK_TYPES[blockType].solid &&
+        CONFIG.BLOCK_TYPES[blockType].isPlatform
+      ) {
+        // Platformun üzerinde olup olmadığını kontrol et
+        const blockTop = playerBottom * CONFIG.BLOCK_SIZE;
+
+        // Eğer oyuncu platformun üstündeyse
+        if (Math.abs(playerBottomPos - blockTop) < 2) {
+          onPlatform = true;
+          platformBlocks.push(x);
+        }
+      }
+    }
+
+    // Eğer oyuncu bir platform üzerinde değilse
+    if (!onPlatform || platformBlocks.length === 0) {
+      return false;
+    }
+
+    // Oyuncunun sol ve sağ kenarlarını kontrol et
+    const leftEdge = playerLeft - 1;
+    const rightEdge = playerRight + 1;
+
+    // Sol kenar kontrolü
+    const leftBlock = this.game.world.getBlock(leftEdge, playerBottom);
+    const isLeftEdge =
+      platformBlocks.includes(playerLeft) && // Oyuncunun sol ayağı bir platform üzerinde
+      (leftBlock === undefined ||
+        !CONFIG.BLOCK_TYPES[leftBlock]?.solid ||
+        !CONFIG.BLOCK_TYPES[leftBlock]?.isPlatform); // Sol tarafta platform yok
+
+    // Sağ kenar kontrolü
+    const rightBlock = this.game.world.getBlock(rightEdge, playerBottom);
+    const isRightEdge =
+      platformBlocks.includes(playerRight) && // Oyuncunun sağ ayağı bir platform üzerinde
+      (rightBlock === undefined ||
+        !CONFIG.BLOCK_TYPES[rightBlock]?.solid ||
+        !CONFIG.BLOCK_TYPES[rightBlock]?.isPlatform); // Sağ tarafta platform yok
+
+    // Ayrıca, oyuncunun platform üzerinde olup olmadığını daha kesin kontrol et
+    // Oyuncunun merkezi bir platform üzerinde mi?
+    const centerBlockType = this.game.world.getBlock(
+      playerCenterBlockX,
+      playerBottom
+    );
+    const isCenterOnPlatform =
+      centerBlockType !== undefined &&
+      CONFIG.BLOCK_TYPES[centerBlockType]?.solid &&
+      CONFIG.BLOCK_TYPES[centerBlockType]?.isPlatform;
+
+    // Eğer oyuncu sol kenarda ve sola hareket ediyorsa veya sağ kenarda ve sağa hareket ediyorsa
+    // VE oyuncunun merkezi bir platform üzerinde değilse
+    const isOnEdge =
+      ((isLeftEdge && this.game.player.velocityX < -0.1) ||
+        (isRightEdge && this.game.player.velocityX > 0.1)) &&
+      !isCenterOnPlatform;
+
+    // Eğer oyuncu kenar üzerindeyse, durumunu güncelle
+    if (isOnEdge) {
+      // Durum makinesini kullanarak oyuncu durumunu güncelle
+      if (this.game.player.state !== PlayerState.PLATFORM_EDGE) {
+        this.game.player.setState(PlayerState.PLATFORM_EDGE);
+      }
+    } else if (
+      onPlatform &&
+      this.game.player.state === PlayerState.PLATFORM_EDGE
+    ) {
+      // Eğer artık kenar üzerinde değilse ama hala platform üzerindeyse
+      this.game.player.setState(PlayerState.ON_PLATFORM);
+    }
+
+    return isOnEdge;
+  }
+
+  isOnGround(): boolean {
+    // Oyuncunun altındaki blokları kontrol et - daha dar bir çarpışma kutusu kullan
+    const playerLeft = Math.floor(
+      (this.game.player.x + this.game.player.width * 0.15) / CONFIG.BLOCK_SIZE
+    );
+    const playerRight = Math.floor(
+      (this.game.player.x + this.game.player.width * 0.85) / CONFIG.BLOCK_SIZE
+    );
+    const playerBottom = Math.floor(
+      (this.game.player.y + this.game.player.height) / CONFIG.BLOCK_SIZE
+    );
+
+    // Sınırları kontrol et
+    if (playerBottom < 0 || playerBottom >= this.game.world.height) {
+      return false;
+    }
+
+    // Oyuncunun ayaklarının tam pozisyonu
+    const playerBottomPos = this.game.player.y + this.game.player.height;
+
+    // Oyuncunun merkez X pozisyonu
+    const playerCenterX = this.game.player.x + this.game.player.width / 2;
+    const playerCenterBlockX = Math.floor(playerCenterX / CONFIG.BLOCK_SIZE);
+
+    // Önce platform kenarında olup olmadığını kontrol et
+    const onPlatformEdge = this.isOnPlatformEdge();
+
+    // Eğer platform kenarındaysa ve hızlı hareket ediyorsa, yerde değil
+    if (onPlatformEdge && Math.abs(this.game.player.velocityX) > 0.5) {
+      return false;
+    }
+
+    // Oyuncunun altındaki tüm blokları kontrol et
+    for (let x = playerLeft; x <= playerRight; x++) {
+      // Sınırları kontrol et
+      if (x < 0 || x >= this.game.world.width) {
+        continue;
+      }
+
       // Oyuncunun tam altındaki bloğu kontrol et
       const blockType = this.game.world.getBlock(x, playerBottom);
 
-      // Eğer blok varsa ve katıysa, oyuncu yerde demektir
+      // Eğer blok varsa ve katıysa
       if (blockType !== undefined && CONFIG.BLOCK_TYPES[blockType].solid) {
-        // Oyuncunun tam olarak bloğun üstünde olduğunu kontrol et
+        const blockInfo = CONFIG.BLOCK_TYPES[blockType];
         const blockTop = playerBottom * CONFIG.BLOCK_SIZE;
-        const playerBottomPos = this.game.player.y + this.game.player.height;
 
-        // Eğer oyuncu bloğun üstüne çok yakınsa (1 piksel tolerans)
-        if (Math.abs(playerBottomPos - blockTop) < 1) {
-          // Oyuncu yere indiğinde zıplama durumunu sıfırla
+        // Platform kontrolü
+        if (blockInfo.isPlatform) {
+          // Platformun üzerinde olup olmadığını kontrol et
+          if (Math.abs(playerBottomPos - blockTop) < 2) {
+            // Eğer oyuncu yukarı doğru hareket ediyorsa (zıplıyorsa) platform üzerinde değil
+            if (this.game.player.velocityY < 0) {
+              continue;
+            }
+
+            // Oyuncunun merkezi bir platform üzerinde mi?
+            const centerBlockType = this.game.world.getBlock(
+              playerCenterBlockX,
+              playerBottom
+            );
+            const isCenterOnPlatform =
+              centerBlockType !== undefined &&
+              CONFIG.BLOCK_TYPES[centerBlockType]?.solid &&
+              CONFIG.BLOCK_TYPES[centerBlockType]?.isPlatform;
+
+            // Eğer oyuncu platform kenarındaysa ve merkezi platform üzerinde değilse
+            if (onPlatformEdge && !isCenterOnPlatform) {
+              continue; // Platformun kenarından düşebilir
+            }
+
+            // Oyuncu durumunu güncelle
+            if (onPlatformEdge) {
+              this.game.player.setState(PlayerState.PLATFORM_EDGE);
+            } else {
+              this.game.player.setState(PlayerState.ON_PLATFORM);
+            }
+
+            if (this.game.player.isJumping) {
+              this.game.player.isJumping = false;
+            }
+            return true;
+          }
+          continue;
+        }
+
+        // Normal katı blok için kontrol
+        if (Math.abs(playerBottomPos - blockTop) < 2) {
+          // Oyuncu durumunu güncelle
+          if (Math.abs(this.game.player.velocityX) > 0.1) {
+            this.game.player.setState(PlayerState.WALKING);
+          } else {
+            this.game.player.setState(PlayerState.IDLE);
+          }
+
           if (this.game.player.isJumping) {
             this.game.player.isJumping = false;
           }
@@ -142,6 +395,13 @@ class PhysicsEngine {
     }
 
     // Hiçbir katı blok bulunamadıysa, oyuncu havadadır
+    // Oyuncu durumunu güncelle
+    if (this.game.player.velocityY < 0) {
+      this.game.player.setState(PlayerState.JUMPING);
+    } else {
+      this.game.player.setState(PlayerState.FALLING);
+    }
+
     return false;
   }
 
@@ -149,11 +409,12 @@ class PhysicsEngine {
     // Oyuncunun yeni yatay pozisyonunu hesapla
     const newX = this.game.player.x;
 
-    // Oyuncunun sınırlarını hesapla
-    const playerLeft = newX;
-    const playerRight = newX + this.game.player.width;
-    const playerTop = this.game.player.y + 4; // Kafanın 4 piksel altından başla (kafaya çarpma sorununu önlemek için)
-    const playerBottom = this.game.player.y + this.game.player.height - 4; // 4 piksel tolerans
+    // Oyuncunun sınırlarını hesapla - yatay çarpışma için daha dar bir kutu kullan
+    const playerLeft = newX + this.game.player.width * 0.1; // %10 içeriden başla
+    const playerRight = newX + this.game.player.width * 0.9; // %90'a kadar git
+    const playerTop = this.game.player.y + 4 / CONFIG.BLOCK_SIZE; // Kafanın 4 piksel altından başla (kafaya çarpma sorununu önlemek için)
+    const playerBottom =
+      this.game.player.y + this.game.player.height - 4 / CONFIG.BLOCK_SIZE; // 4 piksel tolerans
 
     // Oyuncunun bulunduğu blok koordinatlarını hesapla
     const blockLeft = Math.floor(playerLeft / CONFIG.BLOCK_SIZE);
@@ -161,12 +422,38 @@ class PhysicsEngine {
     const blockTop = Math.floor(playerTop / CONFIG.BLOCK_SIZE);
     const blockBottom = Math.floor(playerBottom / CONFIG.BLOCK_SIZE);
 
+    // Sınırları kontrol et
+    if (
+      blockLeft < 0 ||
+      blockRight >= this.game.world.width ||
+      blockTop < 0 ||
+      blockBottom >= this.game.world.height
+    ) {
+      return;
+    }
+
     // Yatay çarpışma kontrolü
     for (let y = blockTop; y <= blockBottom; y++) {
+      // Sınırları kontrol et
+      if (y < 0 || y >= this.game.world.height) {
+        continue;
+      }
+
       // Sağa hareket ediyorsa sağdaki blokları kontrol et
       if (this.game.player.velocityX > 0) {
+        // Sınırları kontrol et
+        if (blockRight < 0 || blockRight >= this.game.world.width) {
+          continue;
+        }
+
         const blockType = this.game.world.getBlock(blockRight, y);
         if (blockType !== undefined && CONFIG.BLOCK_TYPES[blockType].solid) {
+          // Platform kontrolü - platformların yanlarından geçilebilir
+          const blockInfo = CONFIG.BLOCK_TYPES[blockType];
+          if (blockInfo.isPlatform) {
+            continue; // Platformların yanlarından geçebilir
+          }
+
           // Çarpışma var, oyuncuyu bloğun soluna yerleştir
           this.game.player.x =
             blockRight * CONFIG.BLOCK_SIZE - this.game.player.width;
@@ -184,8 +471,19 @@ class PhysicsEngine {
       }
       // Sola hareket ediyorsa soldaki blokları kontrol et
       else if (this.game.player.velocityX < 0) {
+        // Sınırları kontrol et
+        if (blockLeft < 0 || blockLeft >= this.game.world.width) {
+          continue;
+        }
+
         const blockType = this.game.world.getBlock(blockLeft, y);
         if (blockType !== undefined && CONFIG.BLOCK_TYPES[blockType].solid) {
+          // Platform kontrolü - platformların yanlarından geçilebilir
+          const blockInfo = CONFIG.BLOCK_TYPES[blockType];
+          if (blockInfo.isPlatform) {
+            continue; // Platformların yanlarından geçebilir
+          }
+
           // Çarpışma var, oyuncuyu bloğun sağına yerleştir
           this.game.player.x = (blockLeft + 1) * CONFIG.BLOCK_SIZE;
 
@@ -220,11 +518,18 @@ class PhysicsEngine {
     // Oyuncunun yeni dikey pozisyonunu hesapla
     const newY = this.game.player.y;
 
-    // Oyuncunun sınırlarını hesapla
-    const playerLeft = this.game.player.x + 2; // 2 piksel tolerans
-    const playerRight = this.game.player.x + this.game.player.width - 2; // 2 piksel tolerans
+    // Oyuncunun sınırlarını hesapla - dikey çarpışma için daha dar bir kutu kullan
+    const playerLeft = this.game.player.x + this.game.player.width * 0.15; // %15 içeriden başla
+    const playerRight = this.game.player.x + this.game.player.width * 0.85; // %85'e kadar git
     const playerTop = newY;
     const playerBottom = newY + this.game.player.height;
+
+    // Oyuncunun merkez X pozisyonu
+    const playerCenterX = this.game.player.x + this.game.player.width / 2;
+
+    // Önceki pozisyonu hesapla
+    const prevPlayerBottom =
+      this.game.player.y - this.game.player.velocityY + this.game.player.height;
 
     // Oyuncunun bulunduğu blok koordinatlarını hesapla
     const blockLeft = Math.floor(playerLeft / CONFIG.BLOCK_SIZE);
@@ -232,37 +537,83 @@ class PhysicsEngine {
     const blockTop = Math.floor(playerTop / CONFIG.BLOCK_SIZE);
     const blockBottom = Math.floor(playerBottom / CONFIG.BLOCK_SIZE);
 
+    // Sınırları kontrol et
+    if (blockBottom < 0 || blockTop >= this.game.world.height) {
+      return;
+    }
+
     // Dikey çarpışma kontrolü
     for (let x = blockLeft; x <= blockRight; x++) {
+      // Sınırları kontrol et
+      if (x < 0 || x >= this.game.world.width) {
+        continue;
+      }
+
       // Aşağı hareket ediyorsa alttaki blokları kontrol et
       if (this.game.player.velocityY > 0) {
+        // Sınırları kontrol et
+        if (blockBottom < 0 || blockBottom >= this.game.world.height) {
+          continue;
+        }
+
         const blockType = this.game.world.getBlock(x, blockBottom);
         if (blockType !== undefined && CONFIG.BLOCK_TYPES[blockType].solid) {
-          // Çarpışma var, oyuncuyu bloğun üstüne yerleştir
-          this.game.player.y =
-            blockBottom * CONFIG.BLOCK_SIZE - this.game.player.height;
+          const blockInfo = CONFIG.BLOCK_TYPES[blockType];
+          const blockTop = blockBottom * CONFIG.BLOCK_SIZE;
+
+          // Platform kontrolü
+          if (blockInfo.isPlatform) {
+            // Eğer oyuncu platformun üstünden geliyorsa çarpışma var
+            // Önceki pozisyonda oyuncu platformun üstündeyse
+            const prevBlockBottom = Math.floor(
+              prevPlayerBottom / CONFIG.BLOCK_SIZE
+            );
+
+            if (prevBlockBottom < blockBottom) {
+              // Platform kenarlarından düşebilmeyi sağla
+              // Ancak sadece hızlı hareket ediyorsa
+              if (
+                this.isOnPlatformEdge() &&
+                Math.abs(this.game.player.velocityX) > 0.5
+              ) {
+                continue; // Platformun kenarından düşebilir
+              }
+
+              // Çarpışma var, oyuncuyu platformun üstüne yerleştir
+              this.game.player.y = blockTop - this.game.player.height;
+              this.game.player.velocityY = 0;
+              this.game.player.isJumping = false;
+              break;
+            }
+            // Aksi halde platformun içinden geçebilir
+            continue;
+          }
+
+          // Normal katı blok için çarpışma
+          this.game.player.y = blockTop - this.game.player.height;
           this.game.player.velocityY = 0;
-
-          // Oyuncu yere indiğinde zıplama durumunu sıfırla
           this.game.player.isJumping = false;
-
           break;
         }
       }
       // Yukarı hareket ediyorsa üstteki blokları kontrol et
       else if (this.game.player.velocityY < 0) {
+        // Sınırları kontrol et
+        if (blockTop < 0 || blockTop >= this.game.world.height) {
+          continue;
+        }
+
         const blockType = this.game.world.getBlock(x, blockTop);
         if (blockType !== undefined && CONFIG.BLOCK_TYPES[blockType].solid) {
+          // Platform kontrolü - platformların altından geçilebilir
+          const blockInfo = CONFIG.BLOCK_TYPES[blockType];
+          if (blockInfo.isPlatform) {
+            continue; // Platformların altından geçebilir
+          }
+
           // Çarpışma var, oyuncuyu bloğun altına yerleştir
           this.game.player.y = (blockTop + 1) * CONFIG.BLOCK_SIZE;
-
-          // Kafaya çarpma durumunda dikey hızı sıfırla
-          // Geri atılma sorununu önlemek için yatay hızı tamamen koruyoruz
           this.game.player.velocityY = 0;
-
-          // Kafaya çarpma durumunda yatay hızı değiştirme
-          // Bu, geri atılma sorununu tamamen çözecek
-
           break;
         }
       }
@@ -336,6 +687,64 @@ class PhysicsEngine {
         this.game.world.height * CONFIG.BLOCK_SIZE - this.game.player.height;
       this.game.player.velocityY = 0;
       this.game.player.isJumping = false;
+    }
+  }
+
+  handlePlatformEdges() {
+    // Eğer oyuncu platform kenarındaysa ve aşağı tuşuna basılıyorsa
+    if (
+      this.game.player.state === PlayerState.PLATFORM_EDGE &&
+      this.game.keys.down
+    ) {
+      // Oyuncunun altındaki blokları kontrol et
+      const playerLeft = Math.floor(this.game.player.x / CONFIG.BLOCK_SIZE);
+      const playerRight = Math.floor(
+        (this.game.player.x + this.game.player.width - 0.01) / CONFIG.BLOCK_SIZE
+      );
+      const playerBottom = Math.floor(
+        (this.game.player.y + this.game.player.height) / CONFIG.BLOCK_SIZE
+      );
+
+      // Oyuncunun ayaklarının tam pozisyonu
+      const playerBottomPos = this.game.player.y + this.game.player.height;
+
+      // Platformları bul
+      let platformBlocks = [];
+      for (let x = playerLeft; x <= playerRight; x++) {
+        const blockType = this.game.world.getBlock(x, playerBottom);
+
+        // Eğer blok bir platform ise
+        if (
+          blockType !== undefined &&
+          CONFIG.BLOCK_TYPES[blockType].solid &&
+          CONFIG.BLOCK_TYPES[blockType].isPlatform
+        ) {
+          // Platformun üzerinde olup olmadığını kontrol et
+          const blockTop = playerBottom * CONFIG.BLOCK_SIZE;
+
+          // Eğer oyuncu platformun üstündeyse
+          if (Math.abs(playerBottomPos - blockTop) < 2) {
+            platformBlocks.push(x);
+          }
+        }
+      }
+
+      // Eğer platform blokları bulunduysa
+      if (platformBlocks.length > 0) {
+        // Oyuncuyu platformdan düşür
+        this.game.player.y += 1; // Platformdan biraz aşağı it
+
+        // Platformdan düşme efekti için küçük bir aşağı hız ver
+        this.game.player.velocityY = 1;
+
+        // Oyuncu durumunu güncelle
+        this.game.player.setState(PlayerState.FALLING);
+
+        // Platformdan düşme sesi çal
+        // this.game.audio.play("platform_drop");
+
+        console.log("Oyuncu platformdan düştü");
+      }
     }
   }
 }

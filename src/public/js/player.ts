@@ -1,6 +1,16 @@
 import CONFIG from "./config.js";
 import Game from "./game.js";
 
+// Oyuncu durumları için enum ekle
+export enum PlayerState {
+  IDLE = "idle",
+  WALKING = "walking",
+  JUMPING = "jumping",
+  FALLING = "falling",
+  ON_PLATFORM = "on_platform",
+  PLATFORM_EDGE = "platform_edge",
+}
+
 // Animasyon arayüzü
 interface Animation {
   frame: number;
@@ -33,6 +43,7 @@ class Player {
   isJumping: boolean;
   animation: Animation;
   sprites: Sprites;
+  state: PlayerState; // Yeni durum özelliği
 
   constructor(game: Game, x: number, y: number) {
     this.game = game;
@@ -46,6 +57,7 @@ class Player {
     this.inventory = [];
     this.direction = 1; // 1: sağa, -1: sola
     this.isJumping = false;
+    this.state = PlayerState.IDLE; // Başlangıç durumu
     this.animation = {
       frame: 0,
       maxFrames: 4,
@@ -392,40 +404,64 @@ class Player {
     }
   }
 
-  update(deltaTime: number): void {
-    // Yatay hareket - ivmelenme ve yavaşlama ile
-    const maxSpeed = this.speed;
-    const acceleration = 0.1;
+  // Durum değiştirme fonksiyonu
+  setState(newState: PlayerState): void {
+    if (this.state !== newState) {
+      const oldState = this.state;
+      this.state = newState;
+      console.log(`Oyuncu durumu değişti: ${oldState} -> ${newState}`);
 
-    if (this.game.keys.left) {
-      // Sola ivmelenme
-      this.velocityX -= acceleration;
-      if (this.velocityX < -maxSpeed) this.velocityX = -maxSpeed;
-      this.direction = -1;
-    } else if (this.game.keys.right) {
-      // Sağa ivmelenme
-      this.velocityX += acceleration;
-      if (this.velocityX > maxSpeed) this.velocityX = maxSpeed;
-      this.direction = 1;
-    } else {
-      // Yavaşlama
-      if (Math.abs(this.velocityX) < 0.05) {
-        this.velocityX = 0;
+      // Durum değişikliğine göre özel işlemler
+      switch (newState) {
+        case PlayerState.JUMPING:
+          // Zıplama başladığında yapılacak işlemler
+          break;
+        case PlayerState.PLATFORM_EDGE:
+          // Platform kenarına geldiğinde yapılacak işlemler
+          break;
+        // Diğer durumlar için özel işlemler eklenebilir
+      }
+    }
+  }
+
+  // Durum güncellemesi
+  updateState(): void {
+    // Oyuncunun durumunu belirle
+    if (this.game.physics.isOnGround()) {
+      if (this.game.physics.isOnPlatformEdge()) {
+        this.setState(PlayerState.PLATFORM_EDGE);
+      } else if (Math.abs(this.velocityX) > 0.1) {
+        this.setState(PlayerState.WALKING);
       } else {
-        this.velocityX *= CONFIG.FRICTION;
+        this.setState(PlayerState.IDLE);
+      }
+    } else {
+      if (this.velocityY < 0) {
+        this.setState(PlayerState.JUMPING);
+      } else {
+        this.setState(PlayerState.FALLING);
+      }
+    }
+  }
+
+  update(deltaTime: number): void {
+    // Yatay hareket
+    if (this.game.keys.left) {
+      this.velocityX = -this.speed;
+    } else if (this.game.keys.right) {
+      this.velocityX = this.speed;
+    } else {
+      // Sürtünme uygula
+      this.velocityX *= CONFIG.FRICTION;
+
+      // Çok küçük hızları sıfırla (kayma önleme)
+      if (Math.abs(this.velocityX) < 0.1) {
+        this.velocityX = 0;
       }
     }
 
-    // Dikey hareket (yerçekimi)
-    this.velocityY += CONFIG.GRAVITY;
-
-    // Terminal hız kontrolü
-    if (this.velocityY > CONFIG.TERMINAL_VELOCITY) {
-      this.velocityY = CONFIG.TERMINAL_VELOCITY;
-    }
-
-    // Not: Pozisyon güncellemesi ve çarpışma kontrolü artık physics.js'de yapılıyor
-    // Burada sadece hız hesaplamaları yapılıyor
+    // Durum güncellemesi
+    this.updateState();
 
     // Animasyon güncelleme
     this.updateAnimation(deltaTime);

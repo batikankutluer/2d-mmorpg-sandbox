@@ -200,7 +200,8 @@ class World {
     blockSize: number,
     viewportWidth: number,
     viewportHeight: number,
-    zoom: number
+    zoom: number,
+    blockTextures: { [key: number]: HTMLImageElement } // Önceden yüklenmiş texture'lar
   ): void {
     // Görünüm alanı içindeki blokları hesapla
     const startX = Math.max(0, Math.floor(cameraX / blockSize));
@@ -221,15 +222,32 @@ class World {
         const blockInfo = CONFIG.BLOCK_TYPES[blockType];
 
         if (blockType !== BLOCKS.AIR) {
-          // Blok rengini ayarla
-          ctx.fillStyle = blockInfo.color;
-
-          // Bloğu çiz - ekran koordinatlarını hesapla
+          // Ekran koordinatlarını hesapla
           const screenX = (x * blockSize - cameraX) * zoom;
           const screenY = (y * blockSize - cameraY) * zoom;
           const screenSize = blockSize * zoom;
 
-          ctx.fillRect(screenX, screenY, screenSize, screenSize);
+          // Önceden yüklenmiş texture varsa kullan
+          if (blockTextures[blockType] && blockTextures[blockType].complete) {
+            ctx.drawImage(
+              blockTextures[blockType],
+              screenX,
+              screenY,
+              screenSize,
+              screenSize
+            );
+          } else {
+            // Texture yoksa veya yüklenmemişse renk ile doldur
+            ctx.fillStyle = blockInfo.color;
+            ctx.fillRect(screenX, screenY, screenSize, screenSize);
+          }
+
+          // Platform bloğu ise özel çizim yap
+          if (blockInfo.isPlatform) {
+            // Platform bloğunun üst kısmını daha koyu çiz
+            ctx.fillStyle = "rgba(0,0,0,0.2)";
+            ctx.fillRect(screenX, screenY, screenSize, screenSize * 0.2);
+          }
 
           // Blok kenarlarını çiz (3D efekti için)
           ctx.strokeStyle = "rgba(0,0,0,0.2)";

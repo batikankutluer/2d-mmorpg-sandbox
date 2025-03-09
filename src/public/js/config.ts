@@ -65,8 +65,8 @@ const CONFIG: GameConfig = {
 
   // Oyuncu
   PLAYER_SPEED: 1.25, // Daha düşük hız
-  PLAYER_WIDTH: 1, // Tam kare
-  PLAYER_HEIGHT: 1, // 1 blok yüksekliğinde
+  PLAYER_WIDTH: 0.8, // 1 bloktan daha dar
+  PLAYER_HEIGHT: 0.8, // 1 blok yüksekliğinde
 
   // Kamera
   MIN_ZOOM: 0.5, // Minimum zoom seviyesi
@@ -136,6 +136,7 @@ const CONFIG: GameConfig = {
       color: "#D2B48C", // Tan rengi
       solid: true,
       isPlatform: true, // Platform özelliği
+      texture: "/public/images/block/5.png", // Ahşap platform texture'ı
     },
     [BLOCKS.BEDROCK]: {
       name: getBlockName(BLOCKS.BEDROCK),
