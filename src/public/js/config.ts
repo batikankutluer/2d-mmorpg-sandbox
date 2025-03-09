@@ -5,6 +5,9 @@ interface BlockType {
   name: string;
   color: string;
   solid: boolean;
+  rarity?: number;
+  texture?: string;
+
   isPlatform?: boolean; // Platform özelliği (opsiyonel)
 }
 
@@ -19,7 +22,7 @@ interface GameConfig {
   BLOCK_SIZE: number;
   WORLD_WIDTH: number;
   WORLD_HEIGHT: number;
-
+  BEDROCK_HEIGHT: number;
   // Fizik
   GRAVITY: number;
   FRICTION: number;
@@ -51,11 +54,12 @@ const CONFIG: GameConfig = {
   // Oyun dünyası
   BLOCK_SIZE: 32,
   WORLD_WIDTH: 100, // 100 blok genişlik
-  WORLD_HEIGHT: 54, // 54 blok yükseklik
+  WORLD_HEIGHT: 60, // 60 blok yükseklik
+  BEDROCK_HEIGHT: 6, // 6 blok yükseklik
 
   // Fizik
   GRAVITY: 0.12, // Daha düşük yerçekimi
-  FRICTION: 0.92, // Daha yüksek sürtünme
+  FRICTION: 0.9, // Daha yüksek sürtünme
   TERMINAL_VELOCITY: 3.5, // Daha düşük terminal hız
   JUMP_FORCE: -4.0, // Daha düşük zıplama kuvveti
 
@@ -84,7 +88,7 @@ const CONFIG: GameConfig = {
     },
     [BLOCKS.DIRT]: {
       name: getBlockName(BLOCKS.DIRT),
-      color: "brown",
+      color: "#8B4513",
       solid: true,
     },
     [BLOCKS.STONE]: {
@@ -124,7 +128,7 @@ const CONFIG: GameConfig = {
     },
     [BLOCKS.BRICK]: {
       name: getBlockName(BLOCKS.BRICK),
-      color: "#8B4513",
+      color: "brown",
       solid: true,
     },
     [BLOCKS.WOODEN_PLATFORM]: {
@@ -132,6 +136,11 @@ const CONFIG: GameConfig = {
       color: "#D2B48C", // Tan rengi
       solid: true,
       isPlatform: true, // Platform özelliği
+    },
+    [BLOCKS.BEDROCK]: {
+      name: getBlockName(BLOCKS.BEDROCK),
+      color: "gray",
+      solid: true,
     },
   },
 };

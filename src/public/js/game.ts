@@ -194,9 +194,10 @@ class Game {
       case "7":
       case "8":
       case "9":
+      case "0":
         // Blok seçimi
         const blockType = parseInt(e.key);
-        if (blockType >= 1 && blockType <= 9) {
+        if (blockType >= 0 && blockType <= 9) {
           this.selectedBlock = blockType;
           console.log(`Seçilen blok: ${CONFIG.BLOCK_TYPES[blockType].name}`);
         }

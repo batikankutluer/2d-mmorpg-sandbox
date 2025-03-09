@@ -69,10 +69,23 @@ class World {
     this.addDoor();
 
     // Lav havuzları ekle
-    this.generateLavaPools();
+    this.generateLava();
 
     // Rastgele kum alanları ekle
     this.generateSandAreas();
+
+    this.generateBedrock();
+  }
+
+  generateBedrock(): void {
+    const bedrockHeight = CONFIG.BEDROCK_HEIGHT;
+    const bedrockLevel = this.height - bedrockHeight;
+
+    for (let y = bedrockLevel; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        this.blocks[y][x] = BLOCKS.BEDROCK;
+      }
+    }
   }
 
   addGrassLayer(): void {
@@ -138,20 +151,19 @@ class World {
     }
   }
 
-  generateLavaPools(): void {
+  generateLava(): void {
     // Dünyanın en alt katmanında lav katmanı oluştur
-    const LAVA_SIZE = 6;
-    const LAVA_CHANCE = 0.2;
+    const LAVA_SIZE = 4;
+    const LAVA_CHANCE = 0.15;
+
+    const LAVA_START_Y = this.height - LAVA_SIZE - CONFIG.BEDROCK_HEIGHT;
 
     for (let n = 0; n < LAVA_SIZE; n++) {
-      // Rastgele bir yükseklik seç (en alt 8 blok içinde)
-      const lavaLayerY = this.height - n;
+      const lavaLayerY = LAVA_START_Y + n;
 
       // Lav katmanını oluştur
       for (let x = 0; x < this.width; x++) {
-        // Rastgele boşluklar bırak
         if (Math.random() <= LAVA_CHANCE) {
-          // %70 ihtimalle lav bloğu
           try {
             if (lavaLayerY >= 0 && lavaLayerY < this.height) {
               this.blocks[lavaLayerY][x] = BLOCKS.LAVA;

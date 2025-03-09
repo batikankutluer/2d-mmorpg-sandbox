@@ -5,12 +5,13 @@ export enum BLOCKS {
   STONE = 2,
   WOOD = 3,
   GRASS = 4,
-  SAND = 5,
+  WOODEN_PLATFORM = 5,
   WATER = 6,
   LAVA = 7,
   DOOR = 8,
   BRICK = 9,
-  WOODEN_PLATFORM = 10,
+  SAND = 10,
+  BEDROCK = 11,
 }
 
 // Blok tipi açıklamaları için yardımcı fonksiyon
@@ -38,6 +39,8 @@ export function getBlockName(blockType: BLOCKS): string {
       return "Tuğla";
     case BLOCKS.WOODEN_PLATFORM:
       return "Ahşap Platform";
+    case BLOCKS.BEDROCK:
+      return "Bedrock";
     default:
       return "Bilinmeyen";
   }
