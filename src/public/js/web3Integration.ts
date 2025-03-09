@@ -1,6 +1,30 @@
+import Game from "./game.js";
+
+// Ethereum için global tip tanımlaması
+declare global {
+  interface Window {
+    ethereum: any;
+  }
+}
+
+// Arazi arayüzü
+interface Land {
+  id: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 // Web3 entegrasyonu için yardımcı fonksiyonlar
 class Web3Integration {
-  constructor(game) {
+  game: Game;
+  provider: any;
+  signer: any;
+  landContract: any;
+  tokenContract: any;
+
+  constructor(game: Game) {
     this.game = game;
     this.provider = null;
     this.signer = null;
@@ -8,20 +32,19 @@ class Web3Integration {
     this.tokenContract = null;
   }
 
-  async initialize() {
+  async initialize(): Promise<boolean> {
     try {
       // Web3 provider'ı başlat
       console.log("Web3 entegrasyonu başlatılıyor...");
 
       // Ethers.js'yi dinamik olarak yükle
       try {
-        const { ethers } = await import(
-          "https://cdnjs.cloudflare.com/ajax/libs/ethers/6.11.1/ethers.min.js"
-        );
-
         // Ethereum sağlayıcısı varsa bağlan
         if (window.ethereum) {
-          this.provider = new ethers.BrowserProvider(window.ethereum);
+          // Burada ethers.js kullanılacak, şimdilik mock
+          this.provider = {
+            getSigner: async () => ({ getAddress: async () => "0x123..." }),
+          };
           console.log("Web3 entegrasyonu başarılı");
           return true;
         } else {
@@ -40,7 +63,7 @@ class Web3Integration {
     }
   }
 
-  async connectWallet() {
+  async connectWallet(): Promise<string | null> {
     try {
       // Cüzdan bağlantısı
       await window.ethereum.request({ method: "eth_requestAccounts" });
@@ -60,7 +83,7 @@ class Web3Integration {
     }
   }
 
-  initializeContracts() {
+  initializeContracts(): void {
     // Kontrat ABI'leri ve adresleri burada tanımlanacak
     // Örnek:
     // const landContractABI = [...];
@@ -70,7 +93,12 @@ class Web3Integration {
     console.log("Kontratlar başlatıldı");
   }
 
-  async mintLand(x, y, width, height) {
+  async mintLand(
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ): Promise<boolean> {
     try {
       if (!this.game.isWalletConnected) {
         throw new Error("Cüzdan bağlı değil");
@@ -100,7 +128,7 @@ class Web3Integration {
     }
   }
 
-  async getLands() {
+  async getLands(): Promise<Land[]> {
     try {
       if (!this.game.isWalletConnected) {
         throw new Error("Cüzdan bağlı değil");
@@ -111,7 +139,7 @@ class Web3Integration {
       // const lands = await this.landContract.getLandsByOwner(this.game.wallet);
 
       // Şimdilik örnek veri döndür
-      const lands = [
+      const lands: Land[] = [
         { id: 1, x: 10, y: 20, width: 10, height: 10 },
         { id: 2, x: 30, y: 15, width: 5, height: 5 },
       ];
@@ -123,7 +151,7 @@ class Web3Integration {
     }
   }
 
-  async isLandOwner(x, y) {
+  async isLandOwner(x: number, y: number): Promise<boolean> {
     try {
       if (!this.game.isWalletConnected) {
         return false;

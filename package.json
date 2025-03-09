@@ -2,11 +2,15 @@
   "name": "luanti",
   "version": "1.0.0",
   "description": "Web3 Minecraft benzeri 2D oyun",
-  "main": "server.js",
+  "main": "dist/server.js",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "node dist/server.js",
+    "dev": "nodemon --watch src -e ts,html,css --exec \"npm run build && npm start\"",
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "copy-assets": "cp -r src/views dist/ && cp -r src/public dist/",
+    "postbuild": "npm run copy-assets"
   },
   "repository": {
     "type": "git",
@@ -30,6 +34,10 @@
     "ethers": "^6.11.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9"
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.30",
+    "nodemon": "^3.1.9",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.3"
   }
 }

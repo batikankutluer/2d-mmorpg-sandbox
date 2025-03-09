@@ -4,13 +4,13 @@ import CONFIG from "./config.js";
 // Oyunu başlat
 window.onload = () => {
   // Canvas'ı tam ekran yap
-  const canvas = document.getElementById("gameCanvas");
+  const canvas = document.getElementById("gameCanvas") as HTMLCanvasElement;
   resizeCanvas();
 
   // Pencere boyutu değiştiğinde canvas'ı yeniden boyutlandır
   window.addEventListener("resize", resizeCanvas);
 
-  function resizeCanvas() {
+  function resizeCanvas(): void {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
   }
@@ -24,22 +24,22 @@ window.onload = () => {
   document.addEventListener("contextmenu", (e) => e.preventDefault());
 
   // Menü işlemleri
-  const menuButton = document.getElementById("menuButton");
-  const gameMenu = document.getElementById("gameMenu");
-  const closeMenu = document.getElementById("closeMenu");
+  const menuButton = document.getElementById("menuButton") as HTMLButtonElement;
+  const gameMenu = document.getElementById("gameMenu") as HTMLDivElement;
+  const closeMenu = document.getElementById("closeMenu") as HTMLButtonElement;
 
   // Menüyü aç/kapa
   menuButton.addEventListener("click", toggleMenu);
   closeMenu.addEventListener("click", toggleMenu);
 
   // ESC tuşu ile menüyü aç/kapa
-  document.addEventListener("keydown", (e) => {
+  document.addEventListener("keydown", (e: KeyboardEvent) => {
     if (e.key === "Escape") {
       toggleMenu();
     }
   });
 
-  function toggleMenu() {
+  function toggleMenu(): void {
     gameMenu.classList.toggle("hidden");
 
     // Menü açıkken oyunu durdur, kapalıyken devam ettir
@@ -51,10 +51,12 @@ window.onload = () => {
   }
 
   // Tam ekran modu
-  const toggleFullscreenButton = document.getElementById("toggleFullscreen");
+  const toggleFullscreenButton = document.getElementById(
+    "toggleFullscreen"
+  ) as HTMLButtonElement;
   toggleFullscreenButton.addEventListener("click", toggleFullscreen);
 
-  function toggleFullscreen() {
+  function toggleFullscreen(): void {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch((err) => {
         console.error(`Tam ekran hatası: ${err.message}`);
@@ -69,7 +71,9 @@ window.onload = () => {
   }
 
   // Web3 bağlantı butonu
-  const connectButton = document.getElementById("connectWallet");
+  const connectButton = document.getElementById(
+    "connectWallet"
+  ) as HTMLButtonElement | null;
   if (connectButton) {
     connectButton.addEventListener("click", () => {
       game.connectWallet();
@@ -78,7 +82,9 @@ window.onload = () => {
   }
 
   // Arazi oluştur butonu
-  const mintLandButton = document.getElementById("mintLand");
+  const mintLandButton = document.getElementById(
+    "mintLand"
+  ) as HTMLButtonElement | null;
   if (mintLandButton) {
     mintLandButton.addEventListener("click", () => {
       if (!game.isWalletConnected) {
@@ -95,7 +101,9 @@ window.onload = () => {
   }
 
   // Envanter butonu
-  const viewInventoryButton = document.getElementById("viewInventory");
+  const viewInventoryButton = document.getElementById(
+    "viewInventory"
+  ) as HTMLButtonElement | null;
   if (viewInventoryButton) {
     viewInventoryButton.addEventListener("click", () => {
       if (!game.isWalletConnected) {
@@ -117,7 +125,9 @@ window.onload = () => {
   }
 
   // Debug modu butonu
-  const toggleDebugButton = document.getElementById("toggleDebug");
+  const toggleDebugButton = document.getElementById(
+    "toggleDebug"
+  ) as HTMLButtonElement | null;
   if (toggleDebugButton) {
     toggleDebugButton.addEventListener("click", () => {
       game.showDebug = !game.showDebug;
@@ -128,7 +138,7 @@ window.onload = () => {
   }
 
   // Fare tekerleği ile zoom
-  canvas.addEventListener("wheel", (e) => {
+  canvas.addEventListener("wheel", (e: WheelEvent) => {
     e.preventDefault();
 
     // Zoom yönünü belirle

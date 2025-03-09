@@ -4,11 +4,69 @@ import Player from "./player.js";
 import PhysicsEngine from "./physics.js";
 import Web3Integration from "./web3Integration.js";
 
+// Kamera arayüzü
+interface Camera {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
+// Tuş durumları arayüzü
+interface Keys {
+  left: boolean;
+  right: boolean;
+  up: boolean;
+  down: boolean;
+}
+
+// Fare pozisyonu arayüzü
+interface Mouse {
+  x: number;
+  y: number;
+  isDown: boolean;
+  rightIsDown: boolean;
+}
+
+// Arazi arayüzü
+interface Land {
+  id: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 // Web3 2D Minecraft benzeri oyun
 class Game {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  width: number;
+  height: number;
+  blockSize: number;
+  world: World;
+  player: Player;
+  camera: Camera;
+  wallet: string | null;
+  isWalletConnected: boolean;
+  ownedLands: Land[];
+  web3: Web3Integration;
+  isRunning: boolean;
+  selectedBlock: number;
+  isBuilding: boolean;
+  showDebug: boolean;
+  isPaused: boolean;
+  keys: Keys;
+  physics: PhysicsEngine;
+  lastTime: number;
+  accumulator: number;
+  fixedTimeStep: number;
+  frameDelay: number;
+  lastFrameTime: number;
+  mouse: Mouse;
+
   constructor() {
-    this.canvas = document.getElementById("gameCanvas");
-    this.ctx = this.canvas.getContext("2d");
+    this.canvas = document.getElementById("gameCanvas") as HTMLCanvasElement;
+    this.ctx = this.canvas.getContext("2d") as CanvasRenderingContext2D;
     this.width = this.canvas.width;
     this.height = this.canvas.height;
 
@@ -56,8 +114,8 @@ class Game {
     // Oyun döngüsü
     this.lastTime = 0;
     this.accumulator = 0;
-    this.fixedTimeStep = CONFIG.TIME_STEP; // Sabit zaman adımı
-    this.frameDelay = 1000 / CONFIG.FRAME_RATE; // Kare gecikmesi
+    this.fixedTimeStep = CONFIG.TIME_STEP;
+    this.frameDelay = 1000 / CONFIG.FRAME_RATE;
     this.lastFrameTime = 0;
 
     // Fare pozisyonu
@@ -72,7 +130,7 @@ class Game {
     this.setupEventListeners();
   }
 
-  init() {
+  init(): void {
     // Web3 entegrasyonunu başlat
     this.web3.initialize();
 
@@ -82,7 +140,7 @@ class Game {
     console.log("Oyun başlatıldı");
   }
 
-  setupEventListeners() {
+  setupEventListeners(): void {
     // Klavye olayları
     document.addEventListener("keydown", (e) => this.handleKeyDown(e));
     document.addEventListener("keyup", (e) => this.handleKeyUp(e));
@@ -94,7 +152,7 @@ class Game {
     this.canvas.addEventListener("contextmenu", (e) => e.preventDefault());
   }
 
-  handleKeyDown(e) {
+  handleKeyDown(e: KeyboardEvent): void {
     if (this.isPaused) return;
 
     switch (e.key) {
@@ -118,15 +176,14 @@ class Game {
       case "S":
         this.keys.down = true;
         break;
-      case " ":
-        // Zıplama
-        this.physics.jump();
+      case " ": // Boşluk tuşu
+        this.player.jump();
         break;
       case "b":
       case "B":
         // İnşa modunu aç/kapa
         this.isBuilding = !this.isBuilding;
-        console.log("İnşa modu: " + (this.isBuilding ? "Açık" : "Kapalı"));
+        console.log(this.isBuilding ? "İnşa modu açık" : "İnşa modu kapalı");
         break;
       case "1":
       case "2":
@@ -139,15 +196,15 @@ class Game {
       case "9":
         // Blok seçimi
         const blockType = parseInt(e.key);
-        if (CONFIG.BLOCK_TYPES[blockType]) {
+        if (blockType >= 1 && blockType <= 9) {
           this.selectedBlock = blockType;
-          console.log("Seçilen blok: " + CONFIG.BLOCK_TYPES[blockType].name);
+          console.log(`Seçilen blok: ${CONFIG.BLOCK_TYPES[blockType].name}`);
         }
         break;
     }
   }
 
-  handleKeyUp(e) {
+  handleKeyUp(e: KeyboardEvent): void {
     switch (e.key) {
       case "ArrowLeft":
       case "a":
@@ -172,7 +229,7 @@ class Game {
     }
   }
 
-  handleMouseDown(e) {
+  handleMouseDown(e: MouseEvent): void {
     if (this.isPaused) return;
 
     // Sol tık
@@ -187,7 +244,7 @@ class Game {
     }
   }
 
-  handleMouseUp(e) {
+  handleMouseUp(e: MouseEvent): void {
     // Sol tık
     if (e.button === 0) {
       this.mouse.isDown = false;
@@ -198,23 +255,21 @@ class Game {
     }
   }
 
-  handleMouseMove(e) {
+  handleMouseMove(e: MouseEvent): void {
     // Fare pozisyonunu güncelle
     const rect = this.canvas.getBoundingClientRect();
     this.mouse.x = e.clientX - rect.left;
     this.mouse.y = e.clientY - rect.top;
 
-    // Fare basılıysa ve inşa modundaysa blok yerleştir/kaldır
-    if (this.isBuilding) {
-      if (this.mouse.isDown) {
-        this.handleBlockPlacement();
-      } else if (this.mouse.rightIsDown) {
-        this.handleBlockRemoval();
-      }
+    // Fare basılıysa blok yerleştirme/kaldırma işlemlerini kontrol et
+    if (this.mouse.isDown) {
+      this.handleBlockPlacement();
+    } else if (this.mouse.rightIsDown) {
+      this.handleBlockRemoval();
     }
   }
 
-  handleBlockPlacement() {
+  handleBlockPlacement(): void {
     if (!this.isBuilding) return;
 
     // Fare pozisyonunu dünya koordinatlarına dönüştür
@@ -225,15 +280,13 @@ class Game {
       (this.mouse.y / this.camera.zoom + this.camera.y) / this.blockSize
     );
 
-    // Blok yerleştir
+    // Blok yerleştirme kontrolü
     if (this.canPlaceBlock(worldX, worldY)) {
       this.world.setBlock(worldX, worldY, this.selectedBlock);
     }
   }
 
-  handleBlockRemoval() {
-    if (!this.isBuilding) return;
-
+  handleBlockRemoval(): void {
     // Fare pozisyonunu dünya koordinatlarına dönüştür
     const worldX = Math.floor(
       (this.mouse.x / this.camera.zoom + this.camera.x) / this.blockSize
@@ -242,75 +295,89 @@ class Game {
       (this.mouse.y / this.camera.zoom + this.camera.y) / this.blockSize
     );
 
-    // Blok kaldır (hava bloğu yerleştir)
+    // Blok kaldırma kontrolü
     if (this.canRemoveBlock(worldX, worldY)) {
-      this.world.setBlock(worldX, worldY, 0);
+      this.world.setBlock(worldX, worldY, 0); // 0: Hava
     }
   }
 
-  canPlaceBlock(x, y) {
-    // Oyuncunun bulunduğu bloğa yerleştirmeyi engelle
-    const playerBlockX = Math.floor(this.player.x / this.blockSize);
-    const playerBlockY = Math.floor(this.player.y / this.blockSize);
-    const playerBlockX2 = Math.floor(
+  canPlaceBlock(x: number, y: number): boolean {
+    // Dünya sınırları içinde mi?
+    if (x < 0 || x >= this.world.width || y < 0 || y >= this.world.height) {
+      return false;
+    }
+
+    // Mevcut blok hava mı?
+    const currentBlock = this.world.getBlock(x, y);
+    if (currentBlock !== 0) {
+      return false;
+    }
+
+    // Oyuncunun içinde mi?
+    const playerLeft = Math.floor(this.player.x / this.blockSize);
+    const playerRight = Math.floor(
       (this.player.x + this.player.width) / this.blockSize
     );
-    const playerBlockY2 = Math.floor(
+    const playerTop = Math.floor(this.player.y / this.blockSize);
+    const playerBottom = Math.floor(
       (this.player.y + this.player.height) / this.blockSize
     );
 
     if (
-      (x === playerBlockX || x === playerBlockX2) &&
-      (y === playerBlockY || y === playerBlockY2)
+      x >= playerLeft &&
+      x <= playerRight &&
+      y >= playerTop &&
+      y <= playerBottom
     ) {
       return false;
     }
 
-    // Web3 entegrasyonu: Arazi sahipliği kontrolü
-    if (this.isWalletConnected) {
-      return this.web3.isLandOwner(x, y);
-    }
+    // Web3 entegrasyonu: Arazi sahibi mi?
+    // if (!this.web3.isLandOwner(x, y)) {
+    //   return false;
+    // }
 
     return true;
   }
 
-  canRemoveBlock(x, y) {
-    // Kapı bloklarını kaldırmayı engelle
-    const blockType = this.world.getBlock(x, y);
-    if (blockType === 8) {
+  canRemoveBlock(x: number, y: number): boolean {
+    // Dünya sınırları içinde mi?
+    if (x < 0 || x >= this.world.width || y < 0 || y >= this.world.height) {
       return false;
     }
 
-    // Web3 entegrasyonu: Arazi sahipliği kontrolü
-    if (this.isWalletConnected) {
-      return this.web3.isLandOwner(x, y);
+    // Mevcut blok hava değil mi?
+    const currentBlock = this.world.getBlock(x, y);
+    if (currentBlock === 0 || currentBlock === undefined) {
+      return false;
     }
+
+    // Web3 entegrasyonu: Arazi sahibi mi?
+    // if (!this.web3.isLandOwner(x, y)) {
+    //   return false;
+    // }
 
     return true;
   }
 
-  start() {
-    if (this.isRunning) return;
-
-    this.isRunning = true;
-    this.isPaused = false;
-    this.lastTime = performance.now();
-    requestAnimationFrame((timestamp) => this.gameLoop(timestamp));
-  }
-
-  pause() {
-    this.isPaused = true;
-  }
-
-  resume() {
-    if (this.isPaused) {
-      this.isPaused = false;
+  start(): void {
+    if (!this.isRunning) {
+      this.isRunning = true;
       this.lastTime = performance.now();
-      requestAnimationFrame((timestamp) => this.gameLoop(timestamp));
+      this.gameLoop(this.lastTime);
     }
   }
 
-  gameLoop(timestamp) {
+  pause(): void {
+    this.isPaused = true;
+  }
+
+  resume(): void {
+    this.isPaused = false;
+    this.lastTime = performance.now();
+  }
+
+  gameLoop(timestamp: number): void {
     if (!this.isRunning) return;
 
     // Kare hızını sınırla
@@ -321,7 +388,7 @@ class Game {
 
     // Zaman farkını hesapla ve sınırla
     let deltaTime = timestamp - this.lastTime;
-    deltaTime = Math.min(deltaTime, CONFIG.MAX_DELTA_TIME); // Maksimum delta time sınırlaması
+    deltaTime = Math.min(deltaTime, CONFIG.MAX_DELTA_TIME);
 
     this.lastTime = timestamp;
     this.lastFrameTime = timestamp;
@@ -336,7 +403,7 @@ class Game {
     this.accumulator += deltaTime;
 
     // Sabit zaman adımlarıyla fizik güncellemesi
-    const maxSteps = CONFIG.PHYSICS_ITERATIONS; // Fizik hesaplama iterasyon sayısı
+    const maxSteps = CONFIG.PHYSICS_ITERATIONS;
     let steps = 0;
 
     while (this.accumulator >= this.fixedTimeStep && steps < maxSteps) {
@@ -358,7 +425,7 @@ class Game {
     requestAnimationFrame((timestamp) => this.gameLoop(timestamp));
   }
 
-  update(deltaTime) {
+  update(deltaTime: number): void {
     // Oyuncu hareketi
     if (this.keys.left) {
       this.player.velocityX = -this.player.speed;
@@ -378,19 +445,17 @@ class Game {
     this.updateCamera();
   }
 
-  updateCamera(instant = false) {
+  updateCamera(instant: boolean = false): void {
     // Hedef kamera pozisyonu (oyuncuyu merkezde tut)
     const targetX =
-      this.player.x +
-      this.player.width / 2 -
-      this.width / (2 * this.camera.zoom);
+      this.player.x + this.player.width / 2 - this.width / this.camera.zoom / 2;
     const targetY =
       this.player.y +
       this.player.height / 2 -
-      this.height / (2 * this.camera.zoom);
+      this.height / this.camera.zoom / 2;
 
+    // Kamera takibi (yumuşak geçiş)
     if (instant) {
-      // Anında kamera güncellemesi
       this.camera.x = targetX;
       this.camera.y = targetY;
     } else {
@@ -416,12 +481,9 @@ class Game {
     );
   }
 
-  render() {
+  render(): void {
     // Canvas'ı temizle
-    this.ctx.clearRect(0, 0, this.width, this.height);
-
-    // Gökyüzü rengi
-    this.ctx.fillStyle = "#87CEEB"; // Açık mavi
+    this.ctx.fillStyle = "#87CEEB"; // Gökyüzü rengi
     this.ctx.fillRect(0, 0, this.width, this.height);
 
     // Dünyayı çiz
@@ -440,7 +502,7 @@ class Game {
 
     // İnşa modu göstergesi
     if (this.isBuilding) {
-      // Fare pozisyonundaki bloğu vurgula
+      // Fare pozisyonunu dünya koordinatlarına dönüştür
       const worldX = Math.floor(
         (this.mouse.x / this.camera.zoom + this.camera.x) / this.blockSize
       );
@@ -448,86 +510,91 @@ class Game {
         (this.mouse.y / this.camera.zoom + this.camera.y) / this.blockSize
       );
 
+      // Geçerli blok yerleştirme pozisyonunu göster
       const screenX =
         (worldX * this.blockSize - this.camera.x) * this.camera.zoom;
       const screenY =
         (worldY * this.blockSize - this.camera.y) * this.camera.zoom;
+      const screenWidth = this.blockSize * this.camera.zoom;
+      const screenHeight = this.blockSize * this.camera.zoom;
 
-      this.ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
-      this.ctx.lineWidth = 2;
-      this.ctx.strokeRect(
-        screenX,
-        screenY,
-        this.blockSize * this.camera.zoom,
-        this.blockSize * this.camera.zoom
-      );
-
-      // Seçili blok göstergesi
+      // Seçilen bloğun rengini göster
       this.ctx.fillStyle = CONFIG.BLOCK_TYPES[this.selectedBlock].color;
       this.ctx.globalAlpha = 0.5;
-      this.ctx.fillRect(
-        screenX,
-        screenY,
-        this.blockSize * this.camera.zoom,
-        this.blockSize * this.camera.zoom
-      );
+      this.ctx.fillRect(screenX, screenY, screenWidth, screenHeight);
       this.ctx.globalAlpha = 1.0;
+
+      // Blok çerçevesi
+      this.ctx.strokeStyle = "white";
+      this.ctx.lineWidth = 2;
+      this.ctx.strokeRect(screenX, screenY, screenWidth, screenHeight);
     }
 
-    // Debug bilgileri
+    // Debug bilgilerini göster
     if (this.showDebug) {
       this.renderDebugInfo();
     }
   }
 
-  renderDebugInfo() {
-    this.ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+  renderDebugInfo(): void {
+    // Debug bilgilerini ekranın sol üst köşesine çiz
+    this.ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
     this.ctx.fillRect(10, 10, 300, 150);
 
     this.ctx.font = "14px Arial";
     this.ctx.fillStyle = "white";
     this.ctx.textAlign = "left";
+    this.ctx.textBaseline = "top";
 
+    // Oyuncu pozisyonu
+    const playerX = Math.floor(this.player.x);
+    const playerY = Math.floor(this.player.y);
     const playerBlockX = Math.floor(this.player.x / this.blockSize);
     const playerBlockY = Math.floor(this.player.y / this.blockSize);
+    this.ctx.fillText(`Oyuncu Pozisyonu: (${playerX}, ${playerY})`, 20, 20);
+    this.ctx.fillText(
+      `Oyuncu Blok Pozisyonu: (${playerBlockX}, ${playerBlockY})`,
+      20,
+      40
+    );
 
-    this.ctx.fillText(`FPS: ${Math.round(1000 / this.fixedTimeStep)}`, 20, 30);
-    this.ctx.fillText(
-      `Oyuncu Pozisyonu: (${Math.round(this.player.x)}, ${Math.round(
-        this.player.y
-      )})`,
-      20,
-      50
+    // Oyuncu hızı
+    const velocityX = this.player.velocityX.toFixed(2);
+    const velocityY = this.player.velocityY.toFixed(2);
+    this.ctx.fillText(`Oyuncu Hızı: (${velocityX}, ${velocityY})`, 20, 60);
+
+    // Kamera pozisyonu
+    const cameraX = Math.floor(this.camera.x);
+    const cameraY = Math.floor(this.camera.y);
+    this.ctx.fillText(`Kamera Pozisyonu: (${cameraX}, ${cameraY})`, 20, 80);
+
+    // Fare pozisyonu
+    const mouseX = Math.floor(this.mouse.x);
+    const mouseY = Math.floor(this.mouse.y);
+    const mouseWorldX = Math.floor(
+      (this.mouse.x / this.camera.zoom + this.camera.x) / this.blockSize
     );
-    this.ctx.fillText(
-      `Blok Koordinatları: (${playerBlockX}, ${playerBlockY})`,
-      20,
-      70
+    const mouseWorldY = Math.floor(
+      (this.mouse.y / this.camera.zoom + this.camera.y) / this.blockSize
     );
+    this.ctx.fillText(`Fare Pozisyonu: (${mouseX}, ${mouseY})`, 20, 100);
     this.ctx.fillText(
-      `Kamera: (${Math.round(this.camera.x)}, ${Math.round(this.camera.y)})`,
+      `Fare Dünya Pozisyonu: (${mouseWorldX}, ${mouseWorldY})`,
       20,
-      90
+      120
     );
-    this.ctx.fillText(`Zoom: ${this.camera.zoom.toFixed(2)}`, 20, 110);
-    this.ctx.fillText(
-      `İnşa Modu: ${this.isBuilding ? "Açık" : "Kapalı"}`,
-      20,
-      130
-    );
-    this.ctx.fillText(
-      `Seçili Blok: ${CONFIG.BLOCK_TYPES[this.selectedBlock].name}`,
-      20,
-      150
-    );
+
+    // FPS
+    const fps = Math.round(1000 / (performance.now() - this.lastTime));
+    this.ctx.fillText(`FPS: ${fps}`, 20, 140);
   }
 
-  connectWallet() {
-    return this.web3.connectWallet();
+  connectWallet(): void {
+    this.web3.connectWallet();
   }
 
-  mintLand(x, y, width, height) {
-    return this.web3.mintLand(x, y, width, height);
+  mintLand(x: number, y: number, width: number, height: number): void {
+    this.web3.mintLand(x, y, width, height);
   }
 }
 

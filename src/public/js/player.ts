@@ -1,8 +1,40 @@
 import CONFIG from "./config.js";
+import Game from "./game.js";
+
+// Animasyon arayüzü
+interface Animation {
+  frame: number;
+  maxFrames: number;
+  frameDelay: number;
+  frameTimer: number;
+  isWalking: boolean;
+}
+
+// Sprite arayüzü
+interface Sprites {
+  right: HTMLCanvasElement | null;
+  left: HTMLCanvasElement | null;
+  rightWalk: HTMLCanvasElement[];
+  leftWalk: HTMLCanvasElement[];
+}
 
 // Oyuncu sınıfı
 class Player {
-  constructor(game, x, y) {
+  game: Game;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  speed: number;
+  velocityX: number;
+  velocityY: number;
+  inventory: any[];
+  direction: number;
+  isJumping: boolean;
+  animation: Animation;
+  sprites: Sprites;
+
+  constructor(game: Game, x: number, y: number) {
     this.game = game;
     this.x = x;
     this.y = y;
@@ -33,7 +65,7 @@ class Player {
     this.createSprites();
   }
 
-  createSprites() {
+  createSprites(): void {
     // Ana sprite'ları oluştur
     this.createMainSprites();
 
@@ -41,13 +73,14 @@ class Player {
     this.createWalkingSprites();
   }
 
-  createMainSprites() {
+  createMainSprites(): void {
     // Sağa bakan sprite
     this.sprites.right = document.createElement("canvas");
     this.sprites.right.width = CONFIG.BLOCK_SIZE;
     this.sprites.right.height = CONFIG.BLOCK_SIZE * CONFIG.PLAYER_HEIGHT;
 
     const ctxRight = this.sprites.right.getContext("2d");
+    if (!ctxRight) return;
 
     // Growtopia benzeri karakter - sağa bakan
 
@@ -120,6 +153,7 @@ class Player {
     this.sprites.left.height = CONFIG.BLOCK_SIZE * CONFIG.PLAYER_HEIGHT;
 
     const ctxLeft = this.sprites.left.getContext("2d");
+    if (!ctxLeft) return;
 
     // Growtopia benzeri karakter - sola bakan
 
@@ -187,7 +221,7 @@ class Player {
     );
   }
 
-  createWalkingSprites() {
+  createWalkingSprites(): void {
     // Yürüme animasyonu için 4 kare oluştur
     for (let i = 0; i < 4; i++) {
       // Sağa yürüme
@@ -195,9 +229,12 @@ class Player {
       rightWalk.width = CONFIG.BLOCK_SIZE;
       rightWalk.height = CONFIG.BLOCK_SIZE * CONFIG.PLAYER_HEIGHT;
       const ctxRightWalk = rightWalk.getContext("2d");
+      if (!ctxRightWalk) continue;
 
       // Ana gövde ve baş (sabit)
-      ctxRightWalk.drawImage(this.sprites.right, 0, 0);
+      if (this.sprites.right) {
+        ctxRightWalk.drawImage(this.sprites.right, 0, 0);
+      }
 
       // Bacakları farklı pozisyonlarda çiz
       ctxRightWalk.clearRect(
@@ -275,9 +312,12 @@ class Player {
       leftWalk.width = CONFIG.BLOCK_SIZE;
       leftWalk.height = CONFIG.BLOCK_SIZE * CONFIG.PLAYER_HEIGHT;
       const ctxLeftWalk = leftWalk.getContext("2d");
+      if (!ctxLeftWalk) continue;
 
       // Ana gövde ve baş (sabit)
-      ctxLeftWalk.drawImage(this.sprites.left, 0, 0);
+      if (this.sprites.left) {
+        ctxLeftWalk.drawImage(this.sprites.left, 0, 0);
+      }
 
       // Bacakları farklı pozisyonlarda çiz
       ctxLeftWalk.clearRect(
@@ -352,7 +392,7 @@ class Player {
     }
   }
 
-  update(deltaTime) {
+  update(deltaTime: number): void {
     // Yatay hareket - ivmelenme ve yavaşlama ile
     const maxSpeed = this.speed;
     const acceleration = 0.1;
@@ -391,12 +431,12 @@ class Player {
     this.updateAnimation(deltaTime);
   }
 
-  jump() {
+  jump(): void {
     // Zıplama işlemi physics.js'de yapılıyor
     this.game.physics.jump();
   }
 
-  updateAnimation(deltaTime) {
+  updateAnimation(deltaTime: number): void {
     // Hareket ediyorsa animasyonu güncelle
     if (Math.abs(this.velocityX) > 0.3) {
       this.animation.isWalking = true;
@@ -413,7 +453,12 @@ class Player {
     }
   }
 
-  draw(ctx, cameraX, cameraY, zoom) {
+  draw(
+    ctx: CanvasRenderingContext2D,
+    cameraX: number,
+    cameraY: number,
+    zoom: number
+  ): void {
     // Kameraya göre pozisyon hesapla
     const screenX = (this.x - cameraX) * zoom;
     const screenY = (this.y - cameraY) * zoom;
@@ -421,20 +466,24 @@ class Player {
     const screenHeight = this.height * zoom;
 
     // Yöne ve animasyon durumuna göre sprite seç
-    let sprite;
+    let sprite: HTMLCanvasElement | null = null;
 
     if (this.animation.isWalking) {
       // Yürüme animasyonu
       const walkFrames =
         this.direction === 1 ? this.sprites.rightWalk : this.sprites.leftWalk;
-      sprite = walkFrames[this.animation.frame];
+      if (walkFrames.length > this.animation.frame) {
+        sprite = walkFrames[this.animation.frame];
+      }
     } else {
       // Duruş sprite'ı
       sprite = this.direction === 1 ? this.sprites.right : this.sprites.left;
     }
 
     // Oyuncuyu çiz
-    ctx.drawImage(sprite, screenX, screenY, screenWidth, screenHeight);
+    if (sprite) {
+      ctx.drawImage(sprite, screenX, screenY, screenWidth, screenHeight);
+    }
   }
 }
 

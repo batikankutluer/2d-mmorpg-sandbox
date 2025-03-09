@@ -1,8 +1,16 @@
 import CONFIG from "./config.js";
+import Game from "./game.js";
 
 // Basit fizik motoru
 class PhysicsEngine {
-  constructor(game) {
+  game: Game;
+  gravity: number;
+  friction: number;
+  terminalVelocity: number;
+  jumpForce: number;
+  jumpCooldown: number;
+
+  constructor(game: Game) {
     this.game = game;
     this.gravity = CONFIG.GRAVITY;
     this.friction = CONFIG.FRICTION;
@@ -12,7 +20,7 @@ class PhysicsEngine {
   }
 
   // Fizik güncellemesi
-  update() {
+  update(): void {
     // Zıplama bekleme süresini azalt
     if (this.jumpCooldown > 0) {
       this.jumpCooldown--;
@@ -26,7 +34,7 @@ class PhysicsEngine {
 
     // Çarpışma kontrolü - önce yatay sonra dikey hareket için ayrı kontrol
     // Daha küçük adımlarla hareket ettirerek daha doğru çarpışma kontrolü
-    const steps = 6; // Hareket adımı sayısını 5'ten 6'ya çıkardık
+    const steps = 6; // Hareket adımı sayısı
 
     // Yatay ve dikey hızları kaydet
     const originalVelocityX = this.game.player.velocityX;
@@ -55,7 +63,7 @@ class PhysicsEngine {
     // Havada çarpışma durumunda hızları sınırla
     if (!this.isOnGround()) {
       // Havada yatay hızı sınırla
-      const maxAirSpeed = CONFIG.PLAYER_SPEED * 0.9; // 0.8'den 0.9'a çıkardık
+      const maxAirSpeed = CONFIG.PLAYER_SPEED * 0.9;
       if (Math.abs(this.game.player.velocityX) > maxAirSpeed) {
         this.game.player.velocityX =
           Math.sign(this.game.player.velocityX) * maxAirSpeed;
@@ -66,7 +74,7 @@ class PhysicsEngine {
     this.checkWorldBoundaries();
   }
 
-  applyGravity() {
+  applyGravity(): void {
     // Eğer oyuncu havadaysa, yerçekimi uygula
     if (!this.isOnGround()) {
       this.game.player.velocityY += this.gravity;
@@ -81,7 +89,7 @@ class PhysicsEngine {
     }
   }
 
-  updatePlayerMovement() {
+  updatePlayerMovement(): void {
     // Hızları pozisyona uygula - önce yatay sonra dikey hareket
     this.game.player.x += this.game.player.velocityX;
     this.game.player.y += this.game.player.velocityY;
@@ -101,7 +109,7 @@ class PhysicsEngine {
     }
   }
 
-  isOnGround() {
+  isOnGround(): boolean {
     // Oyuncunun altındaki blokları kontrol et
     const playerLeft = Math.floor(this.game.player.x / CONFIG.BLOCK_SIZE);
     const playerRight = Math.floor(
@@ -137,7 +145,7 @@ class PhysicsEngine {
     return false;
   }
 
-  checkHorizontalCollisions() {
+  checkHorizontalCollisions(): void {
     // Oyuncunun yeni yatay pozisyonunu hesapla
     const newX = this.game.player.x;
 
@@ -153,9 +161,6 @@ class PhysicsEngine {
     const blockTop = Math.floor(playerTop / CONFIG.BLOCK_SIZE);
     const blockBottom = Math.floor(playerBottom / CONFIG.BLOCK_SIZE);
 
-    // Çarpışma olup olmadığını kontrol et
-    let collision = false;
-
     // Yatay çarpışma kontrolü
     for (let y = blockTop; y <= blockBottom; y++) {
       // Sağa hareket ediyorsa sağdaki blokları kontrol et
@@ -168,13 +173,12 @@ class PhysicsEngine {
 
           // Havada çarpışma durumunda yatay hızı azalt ama tamamen sıfırlama
           if (!this.isOnGround()) {
-            this.game.player.velocityX *= 0.3; // 0.5'ten 0.3'e düşürdük
+            this.game.player.velocityX *= 0.3;
           } else {
             // Yerdeyse hızı sıfırla
             this.game.player.velocityX = 0;
           }
 
-          collision = true;
           break;
         }
       }
@@ -187,13 +191,12 @@ class PhysicsEngine {
 
           // Havada çarpışma durumunda yatay hızı azalt ama tamamen sıfırlama
           if (!this.isOnGround()) {
-            this.game.player.velocityX *= 0.3; // 0.5'ten 0.3'e düşürdük
+            this.game.player.velocityX *= 0.3;
           } else {
             // Yerdeyse hızı sıfırla
             this.game.player.velocityX = 0;
           }
 
-          collision = true;
           break;
         }
       }
@@ -213,7 +216,7 @@ class PhysicsEngine {
     }
   }
 
-  checkVerticalCollisions() {
+  checkVerticalCollisions(): void {
     // Oyuncunun yeni dikey pozisyonunu hesapla
     const newY = this.game.player.y;
 
@@ -229,9 +232,6 @@ class PhysicsEngine {
     const blockTop = Math.floor(playerTop / CONFIG.BLOCK_SIZE);
     const blockBottom = Math.floor(playerBottom / CONFIG.BLOCK_SIZE);
 
-    // Çarpışma olup olmadığını kontrol et
-    let collision = false;
-
     // Dikey çarpışma kontrolü
     for (let x = blockLeft; x <= blockRight; x++) {
       // Aşağı hareket ediyorsa alttaki blokları kontrol et
@@ -246,7 +246,6 @@ class PhysicsEngine {
           // Oyuncu yere indiğinde zıplama durumunu sıfırla
           this.game.player.isJumping = false;
 
-          collision = true;
           break;
         }
       }
@@ -264,7 +263,6 @@ class PhysicsEngine {
           // Kafaya çarpma durumunda yatay hızı değiştirme
           // Bu, geri atılma sorununu tamamen çözecek
 
-          collision = true;
           break;
         }
       }
@@ -285,7 +283,7 @@ class PhysicsEngine {
     }
   }
 
-  jump() {
+  jump(): void {
     // Eğer oyuncu yerdeyse ve zıplama bekleme süresi bittiyse
     if (this.isOnGround() && this.jumpCooldown <= 0) {
       // Zıplama kuvveti uygula
@@ -312,7 +310,7 @@ class PhysicsEngine {
   }
 
   // Dünya sınırlarını kontrol et
-  checkWorldBoundaries() {
+  checkWorldBoundaries(): void {
     // Yatay sınırlar
     if (this.game.player.x < 0) {
       this.game.player.x = 0;
@@ -337,6 +335,7 @@ class PhysicsEngine {
       this.game.player.y =
         this.game.world.height * CONFIG.BLOCK_SIZE - this.game.player.height;
       this.game.player.velocityY = 0;
+      this.game.player.isJumping = false;
     }
   }
 }
