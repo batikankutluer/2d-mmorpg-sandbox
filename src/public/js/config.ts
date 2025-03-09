@@ -1,8 +1,11 @@
+import { BLOCKS, getBlockName } from "./blocks.js";
+
 // Blok tipi arayüzü
 interface BlockType {
   name: string;
   color: string;
   solid: boolean;
+  isPlatform?: boolean; // Platform özelliği (opsiyonel)
 }
 
 // Blok tipleri sözlüğü arayüzü
@@ -52,12 +55,12 @@ const CONFIG: GameConfig = {
 
   // Fizik
   GRAVITY: 0.12, // Daha düşük yerçekimi
-  FRICTION: 0.96, // Daha yüksek sürtünme
+  FRICTION: 0.92, // Daha yüksek sürtünme
   TERMINAL_VELOCITY: 3.5, // Daha düşük terminal hız
-  JUMP_FORCE: -3.5, // Daha düşük zıplama kuvveti
+  JUMP_FORCE: -4.0, // Daha düşük zıplama kuvveti
 
   // Oyuncu
-  PLAYER_SPEED: 1.0, // Daha düşük hız
+  PLAYER_SPEED: 1.25, // Daha düşük hız
   PLAYER_WIDTH: 1, // Tam kare
   PLAYER_HEIGHT: 1, // 1 blok yüksekliğinde
 
@@ -65,7 +68,7 @@ const CONFIG: GameConfig = {
   MIN_ZOOM: 0.5, // Minimum zoom seviyesi
   MAX_ZOOM: 2.0, // Maximum zoom seviyesi
   ZOOM_SPEED: 0.1, // Zoom hızı
-  
+
   // Oyun döngüsü
   FRAME_RATE: 60, // Hedef FPS
   TIME_STEP: 1000 / 60, // Sabit zaman adımı (ms)
@@ -74,17 +77,63 @@ const CONFIG: GameConfig = {
 
   // Blok tipleri
   BLOCK_TYPES: {
-    0: { name: "Hava", color: "transparent", solid: false },
-    1: { name: "Toprak", color: "brown", solid: true },
-    2: { name: "Taş", color: "gray", solid: true },
-    3: { name: "Ahşap", color: "saddlebrown", solid: true },
-    4: { name: "Çim", color: "green", solid: true },
-    5: { name: "Kum", color: "sandybrown", solid: true },
-    6: { name: "Su", color: "rgba(0, 100, 255, 0.5)", solid: false },
-    7: { name: "Lav", color: "orangered", solid: false },
-    8: { name: "Kapı", color: "white", solid: false },
-    9: { name: "Tuğla", color: "#8B4513", solid: true },
+    [BLOCKS.AIR]: {
+      name: getBlockName(BLOCKS.AIR),
+      color: "transparent",
+      solid: false,
+    },
+    [BLOCKS.DIRT]: {
+      name: getBlockName(BLOCKS.DIRT),
+      color: "brown",
+      solid: true,
+    },
+    [BLOCKS.STONE]: {
+      name: getBlockName(BLOCKS.STONE),
+      color: "gray",
+      solid: true,
+    },
+    [BLOCKS.WOOD]: {
+      name: getBlockName(BLOCKS.WOOD),
+      color: "saddlebrown",
+      solid: true,
+    },
+    [BLOCKS.GRASS]: {
+      name: getBlockName(BLOCKS.GRASS),
+      color: "green",
+      solid: true,
+    },
+    [BLOCKS.SAND]: {
+      name: getBlockName(BLOCKS.SAND),
+      color: "sandybrown",
+      solid: true,
+    },
+    [BLOCKS.WATER]: {
+      name: getBlockName(BLOCKS.WATER),
+      color: "rgba(0, 100, 255, 0.5)",
+      solid: false,
+    },
+    [BLOCKS.LAVA]: {
+      name: getBlockName(BLOCKS.LAVA),
+      color: "orangered",
+      solid: false,
+    },
+    [BLOCKS.DOOR]: {
+      name: getBlockName(BLOCKS.DOOR),
+      color: "white",
+      solid: false,
+    },
+    [BLOCKS.BRICK]: {
+      name: getBlockName(BLOCKS.BRICK),
+      color: "#8B4513",
+      solid: true,
+    },
+    [BLOCKS.WOODEN_PLATFORM]: {
+      name: getBlockName(BLOCKS.WOODEN_PLATFORM),
+      color: "#D2B48C", // Tan rengi
+      solid: true,
+      isPlatform: true, // Platform özelliği
+    },
   },
 };
 
-export default CONFIG; 
+export default CONFIG;

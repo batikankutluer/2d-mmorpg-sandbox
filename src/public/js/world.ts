@@ -1,4 +1,5 @@
 import CONFIG from "./config.js";
+import { BLOCKS } from "./blocks.js";
 
 // Kapı pozisyonu arayüzü
 interface DoorPosition {
@@ -37,28 +38,26 @@ class World {
 
           if (depth < 4) {
             // Üst toprak katmanı
-            this.blocks[y][x] = 1; // Toprak
+            this.blocks[y][x] = BLOCKS.DIRT; // Toprak
           } else if (depth < 10) {
             // Taş katmanı
             if (Math.random() < 0.05) {
               // Nadir kömür/demir madenleri
-              this.blocks[y][x] = 2; // Taş
+              this.blocks[y][x] = BLOCKS.STONE; // Taş
             } else {
-              this.blocks[y][x] = 1; // Toprak
+              this.blocks[y][x] = BLOCKS.DIRT; // Toprak
             }
           } else {
             // En derin katman - lav ve değerli madenler
-            if (Math.random() < 0.02) {
-              this.blocks[y][x] = 7; // Lav
-            } else if (Math.random() < 0.1) {
-              this.blocks[y][x] = 2; // Taş
+            if (Math.random() < 0.1) {
+              this.blocks[y][x] = BLOCKS.STONE; // Taş
             } else {
-              this.blocks[y][x] = 1; // Toprak
+              this.blocks[y][x] = BLOCKS.DIRT; // Toprak
             }
           }
         } else {
           // Zemin üstü - hava
-          this.blocks[y][x] = 0;
+          this.blocks[y][x] = BLOCKS.AIR;
         }
       }
     }
@@ -72,9 +71,6 @@ class World {
     // Lav havuzları ekle
     this.generateLavaPools();
 
-    // Rastgele ağaçlar ekle
-    this.generateTrees();
-
     // Rastgele kum alanları ekle
     this.generateSandAreas();
   }
@@ -84,9 +80,7 @@ class World {
 
     // Zemin seviyesindeki toprak bloklarını çim ile değiştir
     for (let x = 0; x < this.width; x++) {
-      if (this.blocks[groundLevel][x] === 1) {
-        this.blocks[groundLevel][x] = 4; // Çim
-      }
+      this.blocks[groundLevel][x] = BLOCKS.GRASS; // Çim
     }
   }
 
@@ -99,116 +93,89 @@ class World {
     // Kapı pozisyonunu kaydet
     this.doorPosition = { x: doorX, y: groundLevel - 2 };
 
-    // Kapı için zemin oluştur (3 blok genişliğinde düz platform)
-    for (let x = doorX - 1; x <= doorX + 1; x++) {
-      // Zemini tuğla yap
-      this.blocks[groundLevel][x] = 9; // Tuğla
-
-      // Kapı altındaki blokları da tuğla yap (2 blok derinliğinde)
-      this.blocks[groundLevel + 1][x] = 9;
-      this.blocks[groundLevel + 2][x] = 9;
-
-      // Kapının üstündeki blokları temizle
-      for (let y = groundLevel - 3; y >= groundLevel - 5; y--) {
-        if (y >= 0) {
-          this.blocks[y][x] = 0; // Hava
-        }
-      }
-    }
-
-    // Kapı bloğunu yerleştir
-    this.blocks[groundLevel - 2][doorX] = 8; // Kapı
-    this.blocks[groundLevel - 1][doorX] = 8; // Kapı
-
-    // Kapı çerçevesi
-    this.blocks[groundLevel - 3][doorX - 1] = 3; // Ahşap
-    this.blocks[groundLevel - 3][doorX] = 3; // Ahşap
-    this.blocks[groundLevel - 3][doorX + 1] = 3; // Ahşap
-    this.blocks[groundLevel - 2][doorX - 1] = 3; // Ahşap
-    this.blocks[groundLevel - 2][doorX + 1] = 3; // Ahşap
-    this.blocks[groundLevel - 1][doorX - 1] = 3; // Ahşap
-    this.blocks[groundLevel - 1][doorX + 1] = 3; // Ahşap
-
-    // Kapı tokmağı ekle
-    this.addDoorKnob(doorX + 1, groundLevel - 2);
+    this.blocks[groundLevel - 1][doorX] = BLOCKS.DOOR;
 
     // Kapıyı doğrula
     this.verifyDoor();
   }
 
-  addDoorKnob(x: number, y: number): void {
-    // Kapı tokmağı (şimdilik sadece farklı bir blok)
-    this.blocks[y][x] = 5; // Kum
-  }
-
   verifyDoor(): void {
-    // Kapının doğru yerleştirildiğinden emin ol
-    const doorX = this.doorPosition.x;
-    const doorY = this.doorPosition.y;
+    // Kapının etrafında yeterli boş alan olduğundan emin ol
+    const { x, y } = this.doorPosition;
 
-    // Kapı bloğu kontrol et
-    if (this.blocks[doorY][doorX] !== 8) {
-      console.warn("Kapı bloğu doğru yerleştirilmemiş, düzeltiliyor...");
-      this.blocks[doorY][doorX] = 8;
-    }
-
-    // Kapı altındaki zemini kontrol et
-    if (this.blocks[doorY + 1][doorX] !== 0 && this.blocks[doorY + 1][doorX] !== 8) {
-      console.warn("Kapı altındaki zemin doğru değil, düzeltiliyor...");
-      this.blocks[doorY + 1][doorX] = 8;
-    }
-
-    // Kapı üstündeki alanı kontrol et
-    if (this.blocks[doorY - 1][doorX] !== 0) {
-      console.warn("Kapı üstündeki alan açık değil, düzeltiliyor...");
-      this.blocks[doorY - 1][doorX] = 0;
-    }
-  }
-
-  generateLavaPools(): void {
-    const groundLevel = Math.floor(this.height * 0.4);
-
-    // Derin bölgelerde lav havuzları oluştur
-    const poolCount = Math.floor(this.width / 20); // Her 20 blokta bir lav havuzu
-
-    for (let i = 0; i < poolCount; i++) {
-      // Rastgele bir x pozisyonu seç
-      const poolX = Math.floor(Math.random() * this.width);
-      // Rastgele bir y pozisyonu seç (derin bölgelerde)
-      const poolY = groundLevel + 10 + Math.floor(Math.random() * (this.height - groundLevel - 15));
-      // Rastgele bir havuz boyutu seç
-      const poolSize = 2 + Math.floor(Math.random() * 4);
-
-      // Lav havuzu oluştur
-      for (let y = poolY; y < poolY + poolSize && y < this.height; y++) {
-        for (let x = poolX; x < poolX + poolSize * 2 && x < this.width; x++) {
-          if (Math.random() < 0.7) {
-            // %70 ihtimalle lav bloğu yerleştir
-            this.blocks[y][x] = 7; // Lav
+    // Kapının önünde boş alan olduğundan emin ol
+    for (let checkY = y; checkY < y + 2; checkY++) {
+      for (let checkX = x - 3; checkX <= x + 3; checkX++) {
+        if (
+          checkX >= 0 &&
+          checkX < this.width &&
+          checkY >= 0 &&
+          checkY < this.height
+        ) {
+          // Kapı ve çerçeve dışındaki blokları temizle
+          if (
+            !(
+              (
+                (checkX === x && (checkY === y || checkY === y + 1)) || // Kapı bloğu
+                (checkX === x - 1 && checkY >= y && checkY < y + 2) || // Sol çerçeve
+                (checkX === x + 1 && checkY >= y && checkY < y + 2) || // Sağ çerçeve
+                (checkY === y - 1 && checkX >= x - 1 && checkX <= x + 1)
+              ) // Üst çerçeve
+            )
+          ) {
+            // Kapı önündeki alanı temizle
+            if (
+              checkX >= x - 2 &&
+              checkX <= x + 2 &&
+              checkY >= y &&
+              checkY < y + 2
+            ) {
+              this.blocks[checkY][checkX] = BLOCKS.AIR;
+            }
           }
         }
       }
     }
   }
 
-  generateTrees(): void {
-    // Ağaçları ekle
-    // Bu fonksiyon daha sonra eklenecek
+  generateLavaPools(): void {
+    // Dünyanın en alt katmanında lav katmanı oluştur
+    const LAVA_SIZE = 6;
+    const LAVA_CHANCE = 0.2;
+
+    for (let n = 0; n < LAVA_SIZE; n++) {
+      // Rastgele bir yükseklik seç (en alt 8 blok içinde)
+      const lavaLayerY = this.height - n;
+
+      // Lav katmanını oluştur
+      for (let x = 0; x < this.width; x++) {
+        // Rastgele boşluklar bırak
+        if (Math.random() <= LAVA_CHANCE) {
+          // %70 ihtimalle lav bloğu
+          try {
+            if (lavaLayerY >= 0 && lavaLayerY < this.height) {
+              this.blocks[lavaLayerY][x] = BLOCKS.LAVA;
+            }
+          } catch (error) {
+            console.error("Lav oluşturma hatası:", error);
+          }
+        }
+      }
+    }
   }
 
   generateSandAreas(): void {
-    // Kum alanlarını ekle
-    // Bu fonksiyon daha sonra eklenecek
+    // İleride kum alanları oluşturma kodu eklenecek
   }
 
-  getBlock(x: number, y: number): number | undefined {
+  getBlock(x: number, y: number): BLOCKS | undefined {
     if (x >= 0 && x < this.width && y >= 0 && y < this.height) {
-      return this.blocks[y][x];
+      return this.blocks[y][x] as BLOCKS;
     }
     return undefined;
   }
 
-  setBlock(x: number, y: number, blockType: number): void {
+  setBlock(x: number, y: number, blockType: BLOCKS): void {
     if (x >= 0 && x < this.width && y >= 0 && y < this.height) {
       this.blocks[y][x] = blockType;
     }
@@ -223,43 +190,43 @@ class World {
     viewportHeight: number,
     zoom: number
   ): void {
-    // Görünür blokları hesapla
-    const startX = Math.floor(cameraX / blockSize);
-    const endX = Math.ceil((cameraX + viewportWidth / zoom) / blockSize);
-    const startY = Math.floor(cameraY / blockSize);
-    const endY = Math.ceil((cameraY + viewportHeight / zoom) / blockSize);
+    // Görünüm alanı içindeki blokları hesapla
+    const startX = Math.max(0, Math.floor(cameraX / blockSize));
+    const startY = Math.max(0, Math.floor(cameraY / blockSize));
+    const endX = Math.min(
+      this.width,
+      Math.ceil((cameraX + viewportWidth / zoom) / blockSize) + 1
+    );
+    const endY = Math.min(
+      this.height,
+      Math.ceil((cameraY + viewportHeight / zoom) / blockSize) + 1
+    );
 
-    // Görünür blokları çiz
-    for (let y = startY; y <= endY; y++) {
-      for (let x = startX; x <= endX; x++) {
-        // Dünya sınırları içinde mi kontrol et
-        if (x >= 0 && x < this.width && y >= 0 && y < this.height) {
-          const blockType = this.blocks[y][x];
-          const blockInfo = CONFIG.BLOCK_TYPES[blockType];
+    // Görünüm alanı içindeki blokları çiz
+    for (let y = startY; y < endY; y++) {
+      for (let x = startX; x < endX; x++) {
+        const blockType = this.blocks[y][x];
+        const blockInfo = CONFIG.BLOCK_TYPES[blockType];
 
-          // Hava bloklarını çizme
-          if (blockType !== 0) {
-            // Blok pozisyonunu hesapla
-            const blockX = (x * blockSize - cameraX) * zoom;
-            const blockY = (y * blockSize - cameraY) * zoom;
-            const blockWidth = blockSize * zoom;
-            const blockHeight = blockSize * zoom;
+        if (blockType !== BLOCKS.AIR) {
+          // Blok rengini ayarla
+          ctx.fillStyle = blockInfo.color;
 
-            // Blok rengini ayarla
-            ctx.fillStyle = blockInfo.color;
+          // Bloğu çiz - ekran koordinatlarını hesapla
+          const screenX = (x * blockSize - cameraX) * zoom;
+          const screenY = (y * blockSize - cameraY) * zoom;
+          const screenSize = blockSize * zoom;
 
-            // Bloğu çiz
-            ctx.fillRect(blockX, blockY, blockWidth, blockHeight);
+          ctx.fillRect(screenX, screenY, screenSize, screenSize);
 
-            // Blok kenarlarını çiz
-            ctx.strokeStyle = "rgba(0, 0, 0, 0.2)";
-            ctx.lineWidth = 1;
-            ctx.strokeRect(blockX, blockY, blockWidth, blockHeight);
-          }
+          // Blok kenarlarını çiz (3D efekti için)
+          ctx.strokeStyle = "rgba(0,0,0,0.2)";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(screenX, screenY, screenSize, screenSize);
         }
       }
     }
   }
 }
 
-export default World; 
+export default World;
