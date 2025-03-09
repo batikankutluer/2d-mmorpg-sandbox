@@ -1,0 +1,35 @@
+{
+  "name": "luanti",
+  "version": "1.0.0",
+  "description": "Web3 Minecraft benzeri 2D oyun",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/batikankutluer/2d-mmorpg-sandbox.git"
+  },
+  "keywords": [
+    "web3",
+    "game",
+    "minecraft",
+    "2d",
+    "sandbox"
+  ],
+  "author": "Batikan Kutluer <batikankutluer@proton.me>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/batikankutluer/2d-mmorpg-sandbox/issues"
+  },
+  "homepage": "https://github.com/batikankutluer/2d-mmorpg-sandbox#readme",
+  "dependencies": {
+    "express": "^4.21.2",
+    "ethers": "^6.11.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}

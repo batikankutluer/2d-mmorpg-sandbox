@@ -1,3 +1,6 @@
+import Game from "./game.js";
+import CONFIG from "./config.js";
+
 // Oyunu başlat
 window.onload = () => {
   // Canvas'ı tam ekran yap
