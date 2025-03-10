@@ -17,6 +17,7 @@ interface Keys {
   right: boolean;
   up: boolean;
   down: boolean;
+  space: boolean; // Space tuşu
 }
 
 // Fare pozisyonu arayüzü
@@ -85,7 +86,7 @@ class Game {
     this.camera = {
       x: 0,
       y: 0,
-      zoom: 1.0, // Zoom seviyesi
+      zoom: CONFIG.STANDARD_ZOOM, // Zoom seviyesi
     };
 
     // Web3 entegrasyonu
@@ -107,6 +108,7 @@ class Game {
       right: false,
       up: false,
       down: false,
+      space: false,
     };
 
     // Blok texture'ları
@@ -194,6 +196,7 @@ class Game {
       case "w":
       case "W":
         this.keys.up = true;
+        this.player.jump();
         break;
       case "ArrowDown":
       case "s":
@@ -201,6 +204,7 @@ class Game {
         this.keys.down = true;
         break;
       case " ": // Boşluk tuşu
+        this.keys.space = true;
         this.player.jump();
         break;
       case "b":
@@ -256,6 +260,9 @@ class Game {
       case "s":
       case "S":
         this.keys.down = false;
+        break;
+      case " ": // Boşluk tuşu
+        this.keys.space = false;
         break;
     }
   }
@@ -576,7 +583,7 @@ class Game {
   renderDebugInfo(): void {
     // Debug bilgilerini ekranın sol üst köşesine çiz
     this.ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-    this.ctx.fillRect(10, 10, 300, 200); // Yüksekliği artırdım
+    this.ctx.fillRect(10, 10, 300, 240); // Yüksekliği azalttım
 
     this.ctx.font = "14px Arial";
     this.ctx.fillStyle = "white";
@@ -613,20 +620,26 @@ class Game {
     const fps = Math.round(1000 / (performance.now() - this.lastFrameTime));
     this.ctx.fillText(`FPS: ${fps}`, 20, 120);
 
-    // Platform kenarında mı?
-    const onPlatformEdge = this.physics.isOnPlatformEdge();
-    this.ctx.fillText(
-      `Platform Kenarında: ${onPlatformEdge ? "Evet" : "Hayır"}`,
-      20,
-      140
+    // Zıplama bilgileri
+    const jumpHoldTime = this.player.jumpHoldTime;
+    const maxJumpHoldTime = this.player.maxJumpHoldTime;
+    const jumpHoldRatio = Math.min(jumpHoldTime / maxJumpHoldTime, 1.0).toFixed(
+      2
     );
+    const jumpPowerFactor = this.player.jumpPowerFactor.toFixed(2);
+    this.ctx.fillText(
+      `Zıplama Basılı Tutma: ${jumpHoldTime}ms / ${maxJumpHoldTime}ms (${jumpHoldRatio})`,
+      20,
+      160
+    );
+    this.ctx.fillText(`Zıplama Gücü Faktörü: ${jumpPowerFactor}`, 20, 180);
 
     // Oyuncu durumu
-    this.ctx.fillText(`Oyuncu Durumu: ${this.player.state}`, 20, 160);
+    this.ctx.fillText(`Oyuncu Durumu: ${this.player.state}`, 20, 200);
 
     // Yerde mi?
     const onGround = this.physics.isOnGround();
-    this.ctx.fillText(`Yerde mi: ${onGround ? "Evet" : "Hayır"}`, 20, 180);
+    this.ctx.fillText(`Yerde mi: ${onGround ? "Evet" : "Hayır"}`, 20, 220);
 
     // Debug kontrolleri hakkında bilgi
     this.ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
@@ -654,7 +667,7 @@ class Game {
     const screenBottom = (playerBottom - this.camera.y) * this.camera.zoom;
 
     // Çarpışma kutusunu çiz - daha belirgin olması için yarı saydam dolgu ekle
-    this.ctx.fillStyle = "rgba(255, 0, 0, 0.2)"; // Kırmızı yarı saydam dolgu
+    this.ctx.fillStyle = "rgba(255, 0, 0, 0.1)"; // Kırmızı yarı saydam dolgu
     this.ctx.fillRect(
       screenLeft,
       screenTop,
@@ -664,7 +677,7 @@ class Game {
 
     // Çarpışma kutusu çerçevesi
     this.ctx.strokeStyle = "red";
-    this.ctx.lineWidth = 2;
+    this.ctx.lineWidth = 1;
     this.ctx.strokeRect(
       screenLeft,
       screenTop,
@@ -672,14 +685,56 @@ class Game {
       screenBottom - screenTop
     );
 
+    // Gerçek çarpışma kutusu (daha dar)
+    const collisionLeft = playerLeft + this.player.width * 0.15;
+    const collisionRight = playerLeft + this.player.width * 0.85;
+    const collisionTop = playerTop;
+    const collisionBottom = playerBottom;
+
+    // Ekran koordinatlarına dönüştür
+    const screenCollisionLeft =
+      (collisionLeft - this.camera.x) * this.camera.zoom;
+    const screenCollisionRight =
+      (collisionRight - this.camera.x) * this.camera.zoom;
+    const screenCollisionTop =
+      (collisionTop - this.camera.y) * this.camera.zoom;
+    const screenCollisionBottom =
+      (collisionBottom - this.camera.y) * this.camera.zoom;
+
+    // Gerçek çarpışma kutusunu çiz
+    this.ctx.fillStyle = "rgba(255, 0, 0, 0.3)"; // Daha koyu kırmızı yarı saydam dolgu
+    this.ctx.fillRect(
+      screenCollisionLeft,
+      screenCollisionTop,
+      screenCollisionRight - screenCollisionLeft,
+      screenCollisionBottom - screenCollisionTop
+    );
+
+    // Gerçek çarpışma kutusu çerçevesi
+    this.ctx.strokeStyle = "darkred";
+    this.ctx.lineWidth = 2;
+    this.ctx.strokeRect(
+      screenCollisionLeft,
+      screenCollisionTop,
+      screenCollisionRight - screenCollisionLeft,
+      screenCollisionBottom - screenCollisionTop
+    );
+
     // "Collision Box" yazısı ekle
     this.ctx.font = "12px Arial";
     this.ctx.fillStyle = "white";
     this.ctx.textAlign = "center";
     this.ctx.fillText(
-      "Collision Box",
+      "Visual Box",
       screenLeft + (screenRight - screenLeft) / 2,
-      screenTop - 5
+      screenTop - 15
+    );
+
+    // "Actual Collision Box" yazısı ekle
+    this.ctx.fillText(
+      "Actual Collision Box",
+      screenCollisionLeft + (screenCollisionRight - screenCollisionLeft) / 2,
+      screenCollisionTop - 5
     );
 
     // Oyuncunun merkez noktasını çiz
@@ -959,8 +1014,8 @@ class Game {
 
   renderHorizontalCollisionPoints(): void {
     // Oyuncunun yatay çarpışma kontrolü için kullanılan noktalar
-    const playerLeft = this.player.x;
-    const playerRight = this.player.x + this.player.width;
+    const playerLeft = this.player.x + this.player.width * 0.15; // %15 içeriden başla
+    const playerRight = this.player.x + this.player.width * 0.85; // %85'e kadar git
     const playerTop = this.player.y + 4 / this.blockSize; // 4 piksel tolerans
     const playerBottom =
       this.player.y + this.player.height - 4 / this.blockSize; // 4 piksel tolerans
@@ -980,8 +1035,8 @@ class Game {
 
   renderVerticalCollisionPoints(): void {
     // Oyuncunun dikey çarpışma kontrolü için kullanılan noktalar
-    const playerLeft = this.player.x + 2 / this.blockSize; // 2 piksel tolerans
-    const playerRight = this.player.x + this.player.width - 2 / this.blockSize; // 2 piksel tolerans
+    const playerLeft = this.player.x + this.player.width * 0.15; // %15 içeriden başla
+    const playerRight = this.player.x + this.player.width * 0.85; // %85'e kadar git
     const playerTop = this.player.y;
     const playerBottom = this.player.y + this.player.height;
 

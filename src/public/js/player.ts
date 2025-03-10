@@ -44,6 +44,11 @@ class Player {
   animation: Animation;
   sprites: Sprites;
   state: PlayerState; // Yeni durum özelliği
+  jumpStartTime: number; // Zıplama başlangıç zamanı
+  jumpHoldTime: number; // Zıplama tuşuna basılı tutma süresi
+  maxJumpHoldTime: number; // Maksimum zıplama tuşuna basılı tutma süresi
+  jumpPowerFactor: number; // Zıplama gücü faktörü (0.5 ile 1.0 arasında)
+  airJumpCount: number; // Havada zıplama sayısı
 
   constructor(game: Game, x: number, y: number) {
     this.game = game;
@@ -57,14 +62,23 @@ class Player {
     this.inventory = [];
     this.direction = 1; // 1: sağa, -1: sola
     this.isJumping = false;
-    this.state = PlayerState.IDLE; // Başlangıç durumu
     this.animation = {
       frame: 0,
       maxFrames: 4,
-      frameDelay: 10,
+      frameDelay: 100,
       frameTimer: 0,
       isWalking: false,
     };
+
+    // Durum başlangıcı
+    this.state = PlayerState.IDLE;
+
+    // Zıplama değişkenleri
+    this.jumpStartTime = 0;
+    this.jumpHoldTime = 0;
+    this.maxJumpHoldTime = 300; // 300ms
+    this.jumpPowerFactor = 0.75; // Default value
+    this.airJumpCount = 0;
 
     // Sprite'ları oluştur
     this.sprites = {

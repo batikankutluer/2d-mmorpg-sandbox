@@ -236,23 +236,30 @@ class World {
               screenSize,
               screenSize
             );
+
+            // Platform bloğu ise özel çizim yap
+            if (blockInfo.isPlatform) {
+              // Platform bloğunun üst kısmını daha koyu çiz
+              ctx.fillStyle = "rgba(0,0,0,0.2)";
+              ctx.fillRect(screenX, screenY, screenSize, screenSize * 0.2);
+            }
           } else {
             // Texture yoksa veya yüklenmemişse renk ile doldur
             ctx.fillStyle = blockInfo.color;
             ctx.fillRect(screenX, screenY, screenSize, screenSize);
-          }
 
-          // Platform bloğu ise özel çizim yap
-          if (blockInfo.isPlatform) {
-            // Platform bloğunun üst kısmını daha koyu çiz
-            ctx.fillStyle = "rgba(0,0,0,0.2)";
-            ctx.fillRect(screenX, screenY, screenSize, screenSize * 0.2);
-          }
+            // Texture olmayan bloklar için kenar çizgisi çiz
+            ctx.strokeStyle = "rgba(0,0,0,0.2)";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(screenX, screenY, screenSize, screenSize);
 
-          // Blok kenarlarını çiz (3D efekti için)
-          ctx.strokeStyle = "rgba(0,0,0,0.2)";
-          ctx.lineWidth = 1;
-          ctx.strokeRect(screenX, screenY, screenSize, screenSize);
+            // Platform bloğu ise özel çizim yap
+            if (blockInfo.isPlatform) {
+              // Platform bloğunun üst kısmını daha koyu çiz
+              ctx.fillStyle = "rgba(0,0,0,0.2)";
+              ctx.fillRect(screenX, screenY, screenSize, screenSize * 0.2);
+            }
+          }
         }
       }
     }

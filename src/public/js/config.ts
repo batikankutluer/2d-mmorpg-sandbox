@@ -27,7 +27,7 @@ interface GameConfig {
   GRAVITY: number;
   FRICTION: number;
   TERMINAL_VELOCITY: number;
-  JUMP_FORCE: number;
+  JUMP_HEIGHT: number; // Blok cinsinden zıplama yüksekliği
 
   // Oyuncu
   PLAYER_SPEED: number;
@@ -37,6 +37,7 @@ interface GameConfig {
   // Kamera
   MIN_ZOOM: number;
   MAX_ZOOM: number;
+  STANDARD_ZOOM: number;
   ZOOM_SPEED: number;
 
   // Oyun döngüsü
@@ -58,10 +59,10 @@ const CONFIG: GameConfig = {
   BEDROCK_HEIGHT: 6, // 6 blok yükseklik
 
   // Fizik
-  GRAVITY: 0.12, // Daha düşük yerçekimi
+  GRAVITY: 0.05, // Daha düşük yerçekimi (2.5 blok zıplama için)
   FRICTION: 0.9, // Daha yüksek sürtünme
   TERMINAL_VELOCITY: 3.5, // Daha düşük terminal hız
-  JUMP_FORCE: -4.0, // Daha düşük zıplama kuvveti
+  JUMP_HEIGHT: 2.5, // Blok cinsinden zıplama yüksekliği
 
   // Oyuncu
   PLAYER_SPEED: 1.25, // Daha düşük hız
@@ -69,8 +70,9 @@ const CONFIG: GameConfig = {
   PLAYER_HEIGHT: 0.8, // 1 blok yüksekliğinde
 
   // Kamera
-  MIN_ZOOM: 0.5, // Minimum zoom seviyesi
-  MAX_ZOOM: 2.0, // Maximum zoom seviyesi
+  MIN_ZOOM: 1.5, // Minimum zoom seviyesi
+  MAX_ZOOM: 4.0, // Maximum zoom seviyesi
+  STANDARD_ZOOM: 2.0, // Standart zoom seviyesi
   ZOOM_SPEED: 0.1, // Zoom hızı
 
   // Oyun döngüsü

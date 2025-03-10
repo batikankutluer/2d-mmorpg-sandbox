@@ -16,7 +16,17 @@ class PhysicsEngine {
     this.gravity = CONFIG.GRAVITY;
     this.friction = CONFIG.FRICTION;
     this.terminalVelocity = CONFIG.TERMINAL_VELOCITY;
-    this.jumpForce = CONFIG.JUMP_FORCE;
+
+    // Zıplama kuvvetini zıplama yüksekliğine göre hesapla
+    // Fizik formülü: v^2 = 2 * g * h
+    // v: başlangıç hızı, g: yerçekimi, h: yükseklik
+    // v = sqrt(2 * g * h)
+    // Negatif değer yukarı doğru hareketi temsil eder
+    // Tam 2.5 blok yüksekliğine ulaşmak için katsayıyı 1.0 yapıyoruz
+    this.jumpForce = -Math.sqrt(
+      2 * this.gravity * CONFIG.JUMP_HEIGHT * CONFIG.BLOCK_SIZE
+    );
+
     this.jumpCooldown = 0;
   }
 
@@ -30,30 +40,13 @@ class PhysicsEngine {
     // Oyuncuya yerçekimi uygula
     this.applyGravity();
 
+    // Zıplama tuşuna basılı tutma durumunu kontrol et
+    this.checkJumpHold();
+
     // Oyuncunun hareketini güncelle
     // Not: updatePlayerMovement içinde pozisyon güncellemesi yapmıyoruz
-    // Sadece hız hesaplamaları ve platform kenarı kontrolü yapıyoruz
+    // Sadece hız hesaplamaları yapıyoruz
     this.updatePlayerMovement();
-
-    // Platform kenarında olup olmadığını kontrol et
-    const onPlatformEdge = this.isOnPlatformEdge();
-
-    // Oyuncunun merkez X pozisyonu
-    const playerCenterX = this.game.player.x + this.game.player.width / 2;
-    const playerCenterBlockX = Math.floor(playerCenterX / CONFIG.BLOCK_SIZE);
-    const playerBottom = Math.floor(
-      (this.game.player.y + this.game.player.height) / CONFIG.BLOCK_SIZE
-    );
-
-    // Oyuncunun merkezi bir platform üzerinde mi?
-    const centerBlockType = this.game.world.getBlock(
-      playerCenterBlockX,
-      playerBottom
-    );
-    const isCenterOnPlatform =
-      centerBlockType !== undefined &&
-      CONFIG.BLOCK_TYPES[centerBlockType]?.solid &&
-      CONFIG.BLOCK_TYPES[centerBlockType]?.isPlatform;
 
     // Çarpışma kontrolü - önce yatay sonra dikey hareket için ayrı kontrol
     // Daha küçük adımlarla hareket ettirerek daha doğru çarpışma kontrolü
@@ -76,15 +69,6 @@ class PhysicsEngine {
       // Sonra dikey hareket
       this.game.player.y += this.game.player.velocityY;
       this.checkVerticalCollisions();
-
-      // Platform kenarında ise ve hızlı yatay hareket varsa, düşmeyi kolaylaştır
-      if (
-        onPlatformEdge &&
-        Math.abs(this.game.player.velocityX) > 0.5 &&
-        !isCenterOnPlatform
-      ) {
-        this.game.player.velocityY += (this.gravity * 0.1) / steps;
-      }
     }
 
     // Hızları orijinal değerlerine geri getir, ancak çarpışma durumunda değişmiş olabilirler
@@ -104,15 +88,26 @@ class PhysicsEngine {
 
     // Dünya sınırlarını kontrol et
     this.checkWorldBoundaries();
-
-    // Platform kenarlarını kontrol et ve gerekirse düş
-    this.handlePlatformEdges();
   }
 
   applyGravity(): void {
     // Eğer oyuncu havadaysa, yerçekimi uygula
     if (!this.isOnGround()) {
-      this.game.player.velocityY += this.gravity;
+      // Zıplama sırasında (yukarı doğru hareket ederken) yerçekimi etkisini azalt
+      if (this.game.player.velocityY < 0) {
+        // Yukarı doğru hareket ederken daha az yerçekimi
+        // Zıplama tuşuna basılı tutulup tutulmadığını kontrol et
+        const jumpKeyPressed = this.game.keys.up || this.game.keys.space;
+
+        // Tuşa basılıysa daha az yerçekimi, bırakıldıysa daha fazla yerçekimi
+        // Tam 2.5 blok yüksekliğine ulaşmak için yerçekimi faktörünü ayarla
+        const gravityFactor = jumpKeyPressed ? 0.4 : 1.6;
+
+        this.game.player.velocityY += this.gravity * gravityFactor;
+      } else {
+        // Düşerken normal yerçekimi
+        this.game.player.velocityY += this.gravity;
+      }
 
       // Terminal hızı aşmayı önle
       if (this.game.player.velocityY > this.terminalVelocity) {
@@ -121,6 +116,12 @@ class PhysicsEngine {
     } else if (this.game.player.velocityY > 0) {
       // Yerdeyse ve düşüyorsa dikey hızı sıfırla
       this.game.player.velocityY = 0;
+
+      // Yere değdiğinde zıplama durumunu sıfırla
+      this.game.player.isJumping = false;
+
+      // Yere değdiğinde havada zıplama sayısını sıfırla
+      this.game.player.airJumpCount = 0;
     }
   }
 
@@ -178,117 +179,8 @@ class PhysicsEngine {
   }
 
   isOnPlatformEdge(): boolean {
-    // Oyuncunun altındaki blokları kontrol et - daha dar bir çarpışma kutusu kullan
-    const playerLeft = Math.floor(
-      (this.game.player.x + this.game.player.width * 0.15) / CONFIG.BLOCK_SIZE
-    );
-    const playerRight = Math.floor(
-      (this.game.player.x + this.game.player.width * 0.85) / CONFIG.BLOCK_SIZE
-    );
-    const playerBottom = Math.floor(
-      (this.game.player.y + this.game.player.height) / CONFIG.BLOCK_SIZE
-    );
-
-    // Oyuncunun ayaklarının tam pozisyonu
-    const playerBottomPos = this.game.player.y + this.game.player.height;
-
-    // Oyuncunun merkez X pozisyonu
-    const playerCenterX = this.game.player.x + this.game.player.width / 2;
-    const playerCenterBlockX = Math.floor(playerCenterX / CONFIG.BLOCK_SIZE);
-
-    // Sınırları kontrol et
-    if (
-      playerBottom < 0 ||
-      playerBottom >= this.game.world.height ||
-      playerLeft < 0 ||
-      playerRight >= this.game.world.width
-    ) {
-      return false;
-    }
-
-    // Önce oyuncunun bir platform üzerinde olup olmadığını kontrol et
-    let onPlatform = false;
-    let platformBlocks = [];
-
-    // Oyuncunun altındaki tüm blokları kontrol et
-    for (let x = playerLeft; x <= playerRight; x++) {
-      const blockType = this.game.world.getBlock(x, playerBottom);
-
-      // Eğer blok bir platform ise
-      if (
-        blockType !== undefined &&
-        CONFIG.BLOCK_TYPES[blockType].solid &&
-        CONFIG.BLOCK_TYPES[blockType].isPlatform
-      ) {
-        // Platformun üzerinde olup olmadığını kontrol et
-        const blockTop = playerBottom * CONFIG.BLOCK_SIZE;
-
-        // Eğer oyuncu platformun üstündeyse
-        if (Math.abs(playerBottomPos - blockTop) < 2) {
-          onPlatform = true;
-          platformBlocks.push(x);
-        }
-      }
-    }
-
-    // Eğer oyuncu bir platform üzerinde değilse
-    if (!onPlatform || platformBlocks.length === 0) {
-      return false;
-    }
-
-    // Oyuncunun sol ve sağ kenarlarını kontrol et
-    const leftEdge = playerLeft - 1;
-    const rightEdge = playerRight + 1;
-
-    // Sol kenar kontrolü
-    const leftBlock = this.game.world.getBlock(leftEdge, playerBottom);
-    const isLeftEdge =
-      platformBlocks.includes(playerLeft) && // Oyuncunun sol ayağı bir platform üzerinde
-      (leftBlock === undefined ||
-        !CONFIG.BLOCK_TYPES[leftBlock]?.solid ||
-        !CONFIG.BLOCK_TYPES[leftBlock]?.isPlatform); // Sol tarafta platform yok
-
-    // Sağ kenar kontrolü
-    const rightBlock = this.game.world.getBlock(rightEdge, playerBottom);
-    const isRightEdge =
-      platformBlocks.includes(playerRight) && // Oyuncunun sağ ayağı bir platform üzerinde
-      (rightBlock === undefined ||
-        !CONFIG.BLOCK_TYPES[rightBlock]?.solid ||
-        !CONFIG.BLOCK_TYPES[rightBlock]?.isPlatform); // Sağ tarafta platform yok
-
-    // Ayrıca, oyuncunun platform üzerinde olup olmadığını daha kesin kontrol et
-    // Oyuncunun merkezi bir platform üzerinde mi?
-    const centerBlockType = this.game.world.getBlock(
-      playerCenterBlockX,
-      playerBottom
-    );
-    const isCenterOnPlatform =
-      centerBlockType !== undefined &&
-      CONFIG.BLOCK_TYPES[centerBlockType]?.solid &&
-      CONFIG.BLOCK_TYPES[centerBlockType]?.isPlatform;
-
-    // Eğer oyuncu sol kenarda ve sola hareket ediyorsa veya sağ kenarda ve sağa hareket ediyorsa
-    // VE oyuncunun merkezi bir platform üzerinde değilse
-    const isOnEdge =
-      ((isLeftEdge && this.game.player.velocityX < -0.1) ||
-        (isRightEdge && this.game.player.velocityX > 0.1)) &&
-      !isCenterOnPlatform;
-
-    // Eğer oyuncu kenar üzerindeyse, durumunu güncelle
-    if (isOnEdge) {
-      // Durum makinesini kullanarak oyuncu durumunu güncelle
-      if (this.game.player.state !== PlayerState.PLATFORM_EDGE) {
-        this.game.player.setState(PlayerState.PLATFORM_EDGE);
-      }
-    } else if (
-      onPlatform &&
-      this.game.player.state === PlayerState.PLATFORM_EDGE
-    ) {
-      // Eğer artık kenar üzerinde değilse ama hala platform üzerindeyse
-      this.game.player.setState(PlayerState.ON_PLATFORM);
-    }
-
-    return isOnEdge;
+    // Bu fonksiyon artık kullanılmıyor, her zaman false döndür
+    return false;
   }
 
   isOnGround(): boolean {
@@ -311,18 +203,6 @@ class PhysicsEngine {
     // Oyuncunun ayaklarının tam pozisyonu
     const playerBottomPos = this.game.player.y + this.game.player.height;
 
-    // Oyuncunun merkez X pozisyonu
-    const playerCenterX = this.game.player.x + this.game.player.width / 2;
-    const playerCenterBlockX = Math.floor(playerCenterX / CONFIG.BLOCK_SIZE);
-
-    // Önce platform kenarında olup olmadığını kontrol et
-    const onPlatformEdge = this.isOnPlatformEdge();
-
-    // Eğer platform kenarındaysa ve hızlı hareket ediyorsa, yerde değil
-    if (onPlatformEdge && Math.abs(this.game.player.velocityX) > 0.5) {
-      return false;
-    }
-
     // Oyuncunun altındaki tüm blokları kontrol et
     for (let x = playerLeft; x <= playerRight; x++) {
       // Sınırları kontrol et
@@ -338,47 +218,13 @@ class PhysicsEngine {
         const blockInfo = CONFIG.BLOCK_TYPES[blockType];
         const blockTop = playerBottom * CONFIG.BLOCK_SIZE;
 
-        // Platform kontrolü
-        if (blockInfo.isPlatform) {
-          // Platformun üzerinde olup olmadığını kontrol et
-          if (Math.abs(playerBottomPos - blockTop) < 2) {
-            // Eğer oyuncu yukarı doğru hareket ediyorsa (zıplıyorsa) platform üzerinde değil
-            if (this.game.player.velocityY < 0) {
-              continue;
-            }
-
-            // Oyuncunun merkezi bir platform üzerinde mi?
-            const centerBlockType = this.game.world.getBlock(
-              playerCenterBlockX,
-              playerBottom
-            );
-            const isCenterOnPlatform =
-              centerBlockType !== undefined &&
-              CONFIG.BLOCK_TYPES[centerBlockType]?.solid &&
-              CONFIG.BLOCK_TYPES[centerBlockType]?.isPlatform;
-
-            // Eğer oyuncu platform kenarındaysa ve merkezi platform üzerinde değilse
-            if (onPlatformEdge && !isCenterOnPlatform) {
-              continue; // Platformun kenarından düşebilir
-            }
-
-            // Oyuncu durumunu güncelle
-            if (onPlatformEdge) {
-              this.game.player.setState(PlayerState.PLATFORM_EDGE);
-            } else {
-              this.game.player.setState(PlayerState.ON_PLATFORM);
-            }
-
-            if (this.game.player.isJumping) {
-              this.game.player.isJumping = false;
-            }
-            return true;
-          }
-          continue;
-        }
-
-        // Normal katı blok için kontrol
+        // Blok üzerinde olup olmadığını kontrol et (platform veya normal blok)
         if (Math.abs(playerBottomPos - blockTop) < 2) {
+          // Eğer oyuncu yukarı doğru hareket ediyorsa (zıplıyorsa) blok üzerinde değil
+          if (this.game.player.velocityY < 0) {
+            continue;
+          }
+
           // Oyuncu durumunu güncelle
           if (Math.abs(this.game.player.velocityX) > 0.1) {
             this.game.player.setState(PlayerState.WALKING);
@@ -389,6 +235,7 @@ class PhysicsEngine {
           if (this.game.player.isJumping) {
             this.game.player.isJumping = false;
           }
+
           return true;
         }
       }
@@ -635,10 +482,11 @@ class PhysicsEngine {
   }
 
   jump(): void {
-    // Eğer oyuncu yerdeyse ve zıplama bekleme süresi bittiyse
+    // Sadece oyuncu yerdeyse ve zıplama bekleme süresi bittiyse zıplayabilir
     if (this.isOnGround() && this.jumpCooldown <= 0) {
-      // Zıplama kuvveti uygula
-      this.game.player.velocityY = this.jumpForce;
+      // Zıplama kuvveti uygula - minimum zıplama yüksekliği (%70)
+      // Tam 2.5 blok yüksekliğine ulaşmak için jumpForce'un %70'ini kullan
+      this.game.player.velocityY = this.jumpForce * 0.7;
 
       // Zıplama animasyonu
       this.game.player.isJumping = true;
@@ -646,17 +494,19 @@ class PhysicsEngine {
       // Zıplama bekleme süresini ayarla
       this.jumpCooldown = 15;
 
-      // Zıplama sırasında yatay hızı biraz azalt (Growtopia'daki gibi)
+      // Zıplama sırasında yatay hızı biraz azalt
       this.game.player.velocityX *= 0.7;
-    }
-    // Eğer oyuncu havadaysa ve hala yukarı doğru hareket ediyorsa, zıplama tuşuna basılı tutma etkisi
-    else if (
-      this.game.player.isJumping &&
-      this.game.player.velocityY < 0 &&
-      this.jumpCooldown <= 10
-    ) {
-      // Zıplama tuşuna basılı tutma etkisi - yerçekimini azalt
-      this.game.player.velocityY += this.gravity * 0.5; // Yerçekiminin yarısı kadar etki
+
+      // Zıplama başlangıç zamanını kaydet
+      this.game.player.jumpStartTime = Date.now();
+      this.game.player.jumpHoldTime = 0;
+      this.game.player.maxJumpHoldTime = 300; // Maksimum 300ms basılı tutma süresi
+
+      // Zıplama gücü faktörü (0.7 ile 1.0 arasında)
+      this.game.player.jumpPowerFactor = 0.7;
+
+      // Havada zıplama sayısını sıfırla
+      this.game.player.airJumpCount = 0;
     }
   }
 
@@ -690,60 +540,49 @@ class PhysicsEngine {
     }
   }
 
-  handlePlatformEdges() {
-    // Eğer oyuncu platform kenarındaysa ve aşağı tuşuna basılıyorsa
-    if (
-      this.game.player.state === PlayerState.PLATFORM_EDGE &&
-      this.game.keys.down
-    ) {
-      // Oyuncunun altındaki blokları kontrol et
-      const playerLeft = Math.floor(this.game.player.x / CONFIG.BLOCK_SIZE);
-      const playerRight = Math.floor(
-        (this.game.player.x + this.game.player.width - 0.01) / CONFIG.BLOCK_SIZE
-      );
-      const playerBottom = Math.floor(
-        (this.game.player.y + this.game.player.height) / CONFIG.BLOCK_SIZE
-      );
+  // Zıplama tuşuna basılı tutma durumunu kontrol et
+  checkJumpHold(): void {
+    // Eğer oyuncu zıplıyorsa ve yukarı doğru hareket ediyorsa
+    if (this.game.player.isJumping && this.game.player.velocityY < 0) {
+      // Zıplama tuşuna basılı tutulup tutulmadığını kontrol et
+      const jumpKeyPressed = this.game.keys.up || this.game.keys.space;
 
-      // Oyuncunun ayaklarının tam pozisyonu
-      const playerBottomPos = this.game.player.y + this.game.player.height;
+      // Tuşa basılı tutma süresini hesapla
+      const currentTime = Date.now();
+      const holdTime = currentTime - this.game.player.jumpStartTime;
 
-      // Platformları bul
-      let platformBlocks = [];
-      for (let x = playerLeft; x <= playerRight; x++) {
-        const blockType = this.game.world.getBlock(x, playerBottom);
-
-        // Eğer blok bir platform ise
-        if (
-          blockType !== undefined &&
-          CONFIG.BLOCK_TYPES[blockType].solid &&
-          CONFIG.BLOCK_TYPES[blockType].isPlatform
-        ) {
-          // Platformun üzerinde olup olmadığını kontrol et
-          const blockTop = playerBottom * CONFIG.BLOCK_SIZE;
-
-          // Eğer oyuncu platformun üstündeyse
-          if (Math.abs(playerBottomPos - blockTop) < 2) {
-            platformBlocks.push(x);
-          }
+      // Maksimum basılı tutma süresini aştıysak veya tuş bırakıldıysa
+      if (holdTime >= this.game.player.maxJumpHoldTime || !jumpKeyPressed) {
+        // Tuş bırakıldığında veya maksimum süre aşıldığında, zıplama hızını azalt
+        // Bu, zıplama yüksekliğini basma süresine bağlı hale getirir
+        if (this.game.player.velocityY < this.jumpForce * 0.4) {
+          // Hızı yavaşça azalt
+          this.game.player.velocityY *= 0.85;
         }
-      }
+      } else {
+        // Tuşa hala basılıysa ve maksimum süreyi aşmadıysak
+        // Basılı tutma süresine göre zıplama gücünü artır
+        const holdRatio = Math.min(
+          holdTime / this.game.player.maxJumpHoldTime,
+          1.0
+        );
 
-      // Eğer platform blokları bulunduysa
-      if (platformBlocks.length > 0) {
-        // Oyuncuyu platformdan düşür
-        this.game.player.y += 1; // Platformdan biraz aşağı it
+        // Zıplama gücü faktörünü güncelle (0.7'den 1.0'a kadar)
+        // Tam 2.5 blok yüksekliğine ulaşmak için
+        this.game.player.jumpPowerFactor = 0.7 + 0.3 * holdRatio;
 
-        // Platformdan düşme efekti için küçük bir aşağı hız ver
-        this.game.player.velocityY = 1;
+        // Zıplama hızını güncelle - tam 2.5 blok yüksekliğine ulaşmak için
+        const targetVelocity =
+          this.jumpForce * this.game.player.jumpPowerFactor;
 
-        // Oyuncu durumunu güncelle
-        this.game.player.setState(PlayerState.FALLING);
+        // Hızı yumuşak bir şekilde güncelle
+        this.game.player.velocityY = Math.min(
+          this.game.player.velocityY,
+          targetVelocity
+        );
 
-        // Platformdan düşme sesi çal
-        // this.game.audio.play("platform_drop");
-
-        console.log("Oyuncu platformdan düştü");
+        // Zıplama tuşuna basılı tutma süresini güncelle
+        this.game.player.jumpHoldTime = holdTime;
       }
     }
   }
